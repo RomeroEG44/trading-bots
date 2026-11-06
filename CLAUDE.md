@@ -24,7 +24,8 @@ Edgar también debe poder ver en un panel qué está haciendo cada bot.
 ## Estado actual
 - Fase: **0, Fundación** (plan en borrador, aún sin código de trading).
 - Bots de prueba elegidos: Bot 1 "DCA" (BTC/USDT) y Bot 2 "Tendencia" (ETH/USDT). Ver `docs/PLAN.md`.
-- GitHub: pendiente de conectar.
+- GitHub: usuario RomeroEG44, repo `trading-bots` (pendiente de crear).
+- Capital real previsto: ~40 USD (Fase 3).
 
 ## Dónde está cada cosa
 - `docs/PLAN.md`: plan completo, fases y diseño de los bots.

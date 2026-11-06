@@ -7,3 +7,6 @@ Formato: fecha · decisión · por qué · quién decidió.
 - 2026-11-06 · Solo Spot, sin apalancamiento · Sin riesgo de liquidación mientras aprendemos · Claude (propuesta, pendiente de confirmar)
 - 2026-11-06 · Memoria del proyecto en archivos del repo (`CLAUDE.md` + `docs/`) en lugar de un servidor MCP propio · Claude lee `CLAUDE.md` solo al iniciar sesión; queda guardado en GitHub, con historial y gratis · Claude
 - 2026-11-06 · Stack: Python + ccxt + SQLite + FastAPI + Telegram · Simple, estándar y con soporte para el Testnet de Binance · Claude
+- 2026-11-06 · Capital real inicial (Fase 3): ~40 USD en total · Dato de Edgar · Edgar
+- 2026-11-06 · Con 40 USD: 20 USDT por bot; DCA compra 5 USDT cada 3 días (mínimo de orden en Binance ≈ 5 USDT); Bot Tendencia opera con hasta 18 USDT por operación · Ajuste al capital real; los montos del plan v0.1 (10 USDT/día) se aplican solo en Testnet · Claude (propuesta)
+- 2026-11-06 · GitHub: usuario RomeroEG44, repo privado `trading-bots` · Dato de Edgar · Edgar
