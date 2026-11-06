@@ -1,0 +1,15 @@
+# Secretos: NUNCA subir
+.env
+*.key
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Datos locales
+*.sqlite
+*.db
+data/
+logs/
