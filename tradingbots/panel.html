@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel de Bots</title>
+<script src="/static/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f4f2; --surface: #fcfcfb; --border: #e3e2de;
+    --text: #0b0b0b; --text-2: #52514e; --muted: #7a7974;
+    --series-1: #2a78d6; --grid: #ecebe7;
+    --good: #0ca30c; --warning: #fab219; --critical: #d03b3b;
+    --good-bg: #e6f6e6; --warning-bg: #fff5dc; --critical-bg: #fbe9e9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111110; --surface: #1a1a19; --border: #2e2e2c;
+      --text: #f0efec; --text-2: #c3c2b7; --muted: #8f8e86;
+      --series-1: #3987e5; --grid: #2a2a28;
+      --good-bg: #13301a; --warning-bg: #3a2e10; --critical-bg: #3d1717;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 18px; }
+  h1 { font-size: 22px; margin: 0 auto 0 0; }
+  h2 { font-size: 15px; margin: 0 0 12px; color: var(--text-2); font-weight: 600; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+          font-size: 13px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); }
+  .pill.good { background: var(--good-bg); } .pill.warning { background: var(--warning-bg); }
+  .pill.critical { background: var(--critical-bg); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .grid { display: grid; gap: 14px; }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin-bottom: 14px; }
+  .kpi .lbl { color: var(--text-2); font-size: 13px; }
+  .kpi .val { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .kpi .sub { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .pos { color: var(--good); } .neg { color: var(--critical); }
+  .bots { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-bottom: 14px; }
+  .bot h3 { margin: 0; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+  .bot .meta { color: var(--muted); font-size: 13px; margin: 2px 0 10px; }
+  .bot dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 12px; font-size: 14px; }
+  .bot dt { color: var(--text-2); } .bot dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  button { font: inherit; font-size: 14px; padding: 7px 12px; border-radius: 8px; cursor: pointer;
+           border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+  button:hover { border-color: var(--text-2); }
+  button.danger { background: var(--critical); color: #fff; border-color: var(--critical); font-weight: 600; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .two { grid-template-columns: 2fr 1fr; margin-bottom: 14px; }
+  @media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+  .chart-box { position: relative; height: 260px; }
+  .tabs { display: flex; gap: 6px; margin-left: auto; }
+  .tabs button { padding: 3px 9px; font-size: 13px; white-space: nowrap; }
+  .tabs button.on { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .row h2 { margin: 0; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; color: var(--text-2); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tag { white-space: nowrap; font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 6px; }
+  .tag.compra { background: var(--good-bg); } .tag.venta { background: var(--warning-bg); }
+  .events { list-style: none; margin: 0; padding: 0; max-height: 330px; overflow-y: auto; font-size: 14px; }
+  .events li { padding: 7px 0; border-bottom: 1px solid var(--grid); }
+  .events .t { color: var(--muted); font-size: 12px; }
+  .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+  .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text);
+           color: var(--surface); padding: 10px 16px; border-radius: 8px; font-size: 14px; display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🤖 Panel de Bots</h1>
+    <span id="modo" class="pill">—</span>
+    <span id="sup" class="pill">—</span>
+    <span id="latido" class="pill">—</span>
+  </header>
+
+  <section class="grid kpis">
+    <div class="card kpi"><div class="lbl">Valor total</div><div class="val" id="k-total">—</div><div class="sub" id="k-total-sub"></div></div>
+    <div class="card kpi"><div class="lbl">Resultado total</div><div class="val" id="k-res">—</div><div class="sub" id="k-res-sub"></div></div>
+    <div class="card kpi"><div class="lbl">Ganancia realizada (ventas)</div><div class="val" id="k-real">—</div><div class="sub" id="k-real-sub"></div></div>
+    <div class="card kpi"><div class="lbl">Freno del supervisor</div><div class="val" id="k-freno">—</div><div class="sub" id="k-freno-sub"></div></div>
+  </section>
+
+  <section class="grid bots" id="bots"></section>
+
+  <section class="grid two">
+    <div class="card">
+      <div class="row"><h2>Valor total de la cartera (USDT)</h2>
+        <div class="tabs" id="rangos">
+          <button data-d="1">24 h</button><button data-d="7" class="on">7 d</button><button data-d="30">30 d</button>
+        </div>
+      </div>
+      <div class="chart-box"><canvas id="grafica" aria-label="Valor total de la cartera en el tiempo"></canvas></div>
+      <div class="empty" id="grafica-vacia" style="display:none">Todavía no hay suficientes datos. Se guarda un punto cada 5 minutos.</div>
+    </div>
+    <div class="card">
+      <div class="row"><h2>Supervisor y avisos</h2></div>
+      <ul class="events" id="eventos"></ul>
+      <div class="actions" style="margin-top:12px">
+        <button onclick="cmd('pausar')">⏸️ Pausar todo</button>
+        <button onclick="cmd('reanudar')">▶️ Reanudar</button>
+        <button class="danger" onclick="if(confirm('¿Detener TODAS las compras? Solo se reanuda manualmente.')) cmd('detener_todo')">🛑 Detener todo</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row"><h2>Operaciones (más recientes primero)</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Fecha</th><th>Bot</th><th>Lado</th><th style="text-align:right">Precio</th>
+          <th style="text-align:right">USDT</th><th style="text-align:right">Resultado</th><th>¿Por qué?</th></tr></thead>
+        <tbody id="ops"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="ops-vacio" style="display:none">Aún no hay operaciones.</div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (x, d = 2) => (x ?? 0).toLocaleString("es-MX", { minimumFractionDigits: d, maximumFractionDigits: d });
+const signo = (x, d = 2) => (x >= 0 ? "+" : "") + fmt(x, d);
+const cls = (x) => (x >= 0 ? "pos" : "neg");
+const fecha = (iso) => new Date(iso).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let dias = 7, grafica = null;
+
+function toast(t) { const el = $("toast"); el.textContent = t; el.style.display = "block"; setTimeout(() => el.style.display = "none", 3500); }
+
+async function cmd(accion, bot = null) {
+  const r = await fetch("/api/comando", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accion, bot }) });
+  toast(r.ok ? "Comando enviado. Se aplica en unos segundos." : "No se pudo enviar el comando");
+  setTimeout(cargar, 2000);
+}
+
+function pintarCabecera(v, ahora) {
+  const modo = v.modo.toUpperCase();
+  $("modo").className = "pill " + (v.modo === "real" ? "critical" : "");
+  $("modo").textContent = (v.modo === "real" ? "💵 " : "🧪 ") + "Modo " + modo;
+  const s = v.supervisor;
+  const map = { activo: ["good", "🟢 Supervisor activo"], pausado: ["warning", "⏸️ Pausado"], detenido: ["critical", "🚨 Detenido"] };
+  const [c, t] = map[s.estado];
+  $("sup").className = "pill " + c; $("sup").textContent = t; $("sup").title = s.motivo || "";
+  const seg = Math.round((new Date(ahora) - new Date(v.latido)) / 1000);
+  const vivo = seg < 120;
+  $("latido").className = "pill " + (vivo ? "good" : "critical");
+  $("latido").innerHTML = (vivo ? "✅ Funcionando" : "❌ Sin señal") + ` · hace ${seg < 60 ? seg + " s" : Math.round(seg / 60) + " min"}`;
+}
+
+function pintarKpis(d) {
+  const v = d.en_vivo, res = v.total - v.presupuesto;
+  $("k-total").textContent = fmt(v.total) + " USDT";
+  $("k-total-sub").textContent = "Capital inicial " + fmt(v.presupuesto);
+  $("k-res").innerHTML = `<span class="${cls(res)}">${signo(res)}</span>`;
+  $("k-res-sub").textContent = signo((v.total / v.presupuesto - 1) * 100) + " %";
+  $("k-real").innerHTML = `<span class="${cls(d.ganancia_realizada)}">${signo(d.ganancia_realizada)}</span>`;
+  $("k-real-sub").textContent = d.ejecuciones.filter((e) => e.lado === "venta").length + " ventas";
+  const s = v.supervisor;
+  const caida = s.valor_maximo ? (1 - v.total / s.valor_maximo) * 100 : 0;
+  $("k-freno").textContent = fmt(caida, 1) + " % / " + s.limites.caida_maxima_pct + " %";
+  $("k-freno-sub").textContent = "Caída desde el máximo (se detiene al llegar al límite)";
+}
+
+function pintarBots(v) {
+  $("bots").innerHTML = v.bots.map((b) => {
+    const res = b.valor - b.presupuesto, moneda = b.par.split("/")[0];
+    const estado = v.supervisor.estado !== "activo" ? ["warning", "Compras frenadas"] : b.pausado ? ["warning", "⏸️ Pausado"] : ["good", "🟢 Activo"];
+    const tipo = b.estrategia === "dca" ? "Compra programada (DCA)" : "Tendencia (EMA + RSI)";
+    return `<div class="card bot">
+      <h3>${esc(b.nombre)} <span class="pill ${estado[0]}">${estado[1]}</span></h3>
+      <div class="meta">${tipo} · ${esc(b.par)} · velas de ${esc(b.temporalidad)}</div>
+      <dl>
+        <dt>Precio ${moneda}</dt><dd>${fmt(b.precio)}</dd>
+        <dt>Valor</dt><dd>${fmt(b.valor)} USDT</dd>
+        <dt>Resultado</dt><dd class="${cls(res)}">${signo(res)} (${signo((b.valor / b.presupuesto - 1) * 100)} %)</dd>
+        <dt>Efectivo</dt><dd>${fmt(b.efectivo)} USDT</dd>
+        <dt>Posición</dt><dd>${b.cantidad > 0 ? fmt(b.cantidad, 6) + " " + moneda + " a " + fmt(b.precio_promedio) : "—"}</dd>
+        <dt>Próxima revisión</dt><dd>${b.proxima_revision ? fecha(b.proxima_revision) : "—"}</dd>
+      </dl>
+      <div class="actions">${b.pausado
+        ? `<button onclick="cmd('reanudar','${esc(b.nombre)}')">▶️ Reanudar bot</button>`
+        : `<button onclick="cmd('pausar','${esc(b.nombre)}')">⏸️ Pausar bot</button>`}</div>
+    </div>`;
+  }).join("");
+}
+
+function pintarGrafica(valores) {
+  const vacia = valores.length < 2 || typeof Chart === "undefined";
+  $("grafica").style.display = vacia ? "none" : "block";
+  $("grafica-vacia").style.display = vacia ? "block" : "none";
+  if (vacia) return;
+  const datos = valores.map((p) => ({ x: new Date(p.tiempo).getTime(), y: p.total }));
+  const color = css("--series-1"), texto = css("--text-2"), rejilla = css("--grid");
+  if (!grafica) {
+    grafica = new Chart($("grafica"), {
+      type: "line",
+      data: { datasets: [{ data: datos, borderColor: color, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5,
+                           pointHoverBorderWidth: 2, pointHoverBorderColor: css("--surface"), pointHoverBackgroundColor: color, tension: 0 }] },
+      options: {
+        maintainAspectRatio: false, animation: false, parsing: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: { legend: { display: false },
+          tooltip: { displayColors: false, callbacks: {
+            title: (it) => new Date(it[0].parsed.x).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
+            label: (it) => fmt(it.parsed.y) + " USDT" } } },
+        scales: {
+          x: { type: "linear", grid: { display: false }, border: { color: rejilla },
+               ticks: { color: texto, maxTicksLimit: 6, callback: (v) => new Date(v).toLocaleString("es-MX", dias <= 1 ? { hour: "2-digit", minute: "2-digit" } : { day: "2-digit", month: "short" }) } },
+          y: { grid: { color: rejilla }, border: { display: false }, ticks: { color: texto, maxTicksLimit: 5, callback: (v) => fmt(v, 0) } },
+        },
+      },
+    });
+  } else {
+    grafica.data.datasets[0].data = datos;
+  }
+  grafica.options.scales.x.min = datos[0].x;
+  grafica.options.scales.x.max = datos[datos.length - 1].x;
+  grafica.update();
+}
+
+function pintarEventos(eventos) {
+  const icono = { pausa: "⏸️", detencion: "🚨", reanudacion: "▶️", rechazo: "🛑", error: "⚠️", inicio: "🤖", fin: "⏹️", info: "ℹ️" };
+  $("eventos").innerHTML = eventos.length ? eventos.map((e) =>
+    `<li>${icono[e.tipo] || "•"} ${e.bot ? "<b>" + esc(e.bot) + "</b>: " : ""}${esc(e.mensaje)}<div class="t">${fecha(e.tiempo)}</div></li>`).join("")
+    : '<li class="empty">Sin eventos todavía.</li>';
+}
+
+function pintarOperaciones(ops) {
+  $("ops-vacio").style.display = ops.length ? "none" : "block";
+  $("ops").innerHTML = ops.slice(0, 60).map((e) => `<tr>
+    <td style="white-space:nowrap">${fecha(e.tiempo)}</td><td>${esc(e.bot)}</td>
+    <td><span class="tag ${e.lado}">${e.lado === "compra" ? "▲ compra" : "▼ venta"}</span></td>
+    <td class="n">${fmt(e.precio)}</td><td class="n">${fmt(e.monto_usdt)}</td>
+    <td class="n ${e.ganancia_usdt == null ? "" : cls(e.ganancia_usdt)}">${e.ganancia_usdt == null ? "" : signo(e.ganancia_usdt)}</td>
+    <td>${esc(e.motivo)}</td></tr>`).join("");
+}
+
+async function cargar() {
+  try {
+    const d = await (await fetch("/api/estado?dias=" + dias)).json();
+    if (!d.en_vivo) { $("latido").textContent = "Esperando al motor…"; return; }
+    pintarCabecera(d.en_vivo, d.ahora); pintarKpis(d); pintarBots(d.en_vivo);
+    pintarGrafica(d.valores); pintarEventos(d.eventos); pintarOperaciones(d.ejecuciones);
+  } catch (e) {
+    $("latido").className = "pill critical"; $("latido").textContent = "❌ El panel no responde";
+  }
+}
+
+$("rangos").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button"); if (!b) return;
+  dias = +b.dataset.d;
+  document.querySelectorAll("#rangos button").forEach((x) => x.classList.toggle("on", x === b));
+  cargar();
+});
+cargar();
+setInterval(cargar, 10000);
+</script>
+</body>
+</html>

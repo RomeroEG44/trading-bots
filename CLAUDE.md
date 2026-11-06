@@ -22,18 +22,27 @@ Edgar también debe poder ver en un panel qué está haciendo cada bot.
 6. Cualquier cambio a límites de riesgo se anota en `docs/DECISIONES.md`.
 
 ## Estado actual
-- Fase: **0 casi terminada, 1 (backtest) primera ronda hecha**. Ver `docs/RESULTADOS_BACKTEST.md`.
+- Fase: **2, en vivo (Testnet)**: motor + supervisor + Telegram + panel listos. Edgar ya verificó la conexión al Testnet.
 - Bots: Bot 1 "DCA" (BTC/USDT, semanal) y Bot 2 "Tendencia" (ETH/USDT, **velas diarias**).
-- Hallazgo clave: ninguna estrategia gana de forma confiable todavía; en 1 h las comisiones destruyen al bot Tendencia.
+- Hallazgo del backtest: ninguna estrategia gana de forma confiable todavía (`docs/RESULTADOS_BACKTEST.md`).
 - GitHub: https://github.com/RomeroEG44/trading-bots (privado).
 - Capital real previsto: ~40 USD (Fase 3), `config/real.yaml`.
-- **Binance bloquea su API desde la nube de Claude** (error "restricted location"). Solo funciona
-  `data-api.binance.vision` (datos públicos) → aquí se hacen backtests; los bots que operan corren en la PC de Edgar.
-- Pendiente de Edgar: seguir `docs/GUIA_INSTALACION.md` y correr `python -m tradingbots.verificar_conexion`.
+- **Binance bloquea su API (testnet y real) desde la nube de Claude**, y Telegram también está bloqueado aquí.
+  Solo funciona `data-api.binance.vision` → aquí: backtests y modo papel; los bots que operan corren en la PC de Edgar.
+- Pendiente de Edgar: configurar Telegram y dejar el motor corriendo en Testnet 2-4 semanas (`docs/GUIA_INSTALACION.md`).
+
+## Arquitectura en vivo
+- `motor.py`: ciclo cada 15 s; vigila stops con el precio actual, decide al cerrar cada vela, guarda todo en SQLite
+  (`data/bots_<modo>.sqlite`), atiende comandos (Telegram y panel) y manda avisos.
+- `mercado.py`: las velas siempre vienen de los datos públicos; las órdenes van a `BrokerPapel` (simulado) o `BrokerBinance` (ccxt).
+- Cada bot tiene su **cartera virtual** (presupuesto propio) dentro de la misma cuenta de Binance.
+- `panel.py` + `panel.html`: FastAPI en 127.0.0.1:8000; Chart.js guardado en `tradingbots/static/` (sin depender de internet).
+- Modo real exige `--confirmo-dinero-real` y `config/real.yaml`.
 
 ## Comandos
 - Pruebas: `python -m pytest -q`
 - Backtest: `python -m tradingbots.backtest [--config config/real.yaml] [--dias 365]`
+- En vivo: `python -m tradingbots.motor [--modo papel|testnet|real]` (panel en http://localhost:8000)
 - Conexión (solo en la PC de Edgar): `python -m tradingbots.verificar_conexion`
 
 ## Dónde está cada cosa

@@ -35,6 +35,7 @@ class Ejecucion:
     comision_usdt: float
     motivo: str
     ganancia_usdt: float | None = None  # solo en ventas: ganancia/pérdida realizada
+    id_orden: str | None = None  # número de orden en Binance (None en simulación)
 
 
 @dataclass

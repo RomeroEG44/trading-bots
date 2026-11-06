@@ -26,6 +26,7 @@ class Tendencia(Estrategia):
         "fraccion_capital": 0.9,  # qué parte del efectivo usar en cada entrada
     }
     velas_minimas = 60
+    CAMPOS_ESTADO = ("precio_entrada", "maximo")
 
     def __init__(self, nombre, par, parametros=None):
         super().__init__(nombre, par, parametros)
@@ -73,6 +74,21 @@ class Tendencia(Estrategia):
                 "compra", monto_usdt=cartera.efectivo * p["fraccion_capital"],
                 motivo=f"Cruce alcista EMA{p['ema_rapida']}/EMA{p['ema_lenta']} con RSI {u['rsi']:.0f}",
             )]
+        return []
+
+    def revisar_salidas(self, precio: float, cartera: Cartera) -> list[Intencion]:
+        """En vivo: vigila stop-loss, take-profit y trailing con el precio actual, sin esperar al cierre de la vela."""
+        if not (cartera.cantidad > 0 and self.precio_entrada):
+            return []
+        p, e = self.p, self.precio_entrada
+        vender = lambda motivo: [self._intencion("venta", cantidad=cartera.cantidad, motivo=motivo)]
+        if precio <= e * (1 - p["stop_loss_pct"] / 100):
+            return vender(f"Stop-loss: bajó {p['stop_loss_pct']}% desde la entrada {e:,.2f}")
+        if precio >= e * (1 + p["take_profit_pct"] / 100):
+            return vender(f"Take-profit: subió {p['take_profit_pct']}% desde la entrada {e:,.2f}")
+        if self.maximo >= e * (1 + p["trailing_activacion_pct"] / 100) and precio <= self.maximo * (1 - p["trailing_pct"] / 100):
+            return vender(f"Trailing stop: retrocedió {p['trailing_pct']}% desde el máximo {self.maximo:,.2f}")
+        self.maximo = max(self.maximo, precio)
         return []
 
     def en_ejecucion(self, e: Ejecucion) -> None:

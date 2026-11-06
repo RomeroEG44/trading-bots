@@ -17,6 +17,7 @@ class DCA(Estrategia):
         "fraccion_venta": 0.25,  # qué parte de la posición vender en la toma de ganancias
     }
     velas_minimas = 1
+    CAMPOS_ESTADO = ("ultima_compra_t", "ultima_compra_precio", "ultima_toma_precio")
 
     def __init__(self, nombre, par, parametros=None):
         super().__init__(nombre, par, parametros)

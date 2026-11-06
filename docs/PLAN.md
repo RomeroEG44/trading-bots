@@ -103,7 +103,7 @@ que operan no pueden correr aquí (aquí solo se programan y se hacen backtests)
 ## 8. Lo que Edgar tiene que hacer (checklist)
 - [x] Conectar GitHub a Claude.
 - [x] Crear el repositorio `trading-bots` en GitHub.
-- [ ] Instalar el proyecto en tu PC: `docs/GUIA_INSTALACION.md`.
-- [ ] Crear cuenta en el **Binance Spot Testnet** (testnet.binance.vision) y generar claves de prueba. *(Fase 0)*
-- [ ] Crear un bot de Telegram con @BotFather (te guío paso a paso). *(Fase 2)*
+- [x] Instalar el proyecto en tu PC.
+- [x] Crear cuenta en el **Binance Spot Testnet** y verificar la conexión. *(Fase 0)*
+- [ ] Crear un bot de Telegram con @BotFather: `docs/GUIA_INSTALACION.md`, paso 8. *(Fase 2)*
 - [ ] Revisar este plan y responder `docs/PREGUNTAS.md`.

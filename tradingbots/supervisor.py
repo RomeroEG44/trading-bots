@@ -50,6 +50,7 @@ class Supervisor:
         self.valor_maximo: float | None = None
         self.ultimo_valor: float | None = None
         self.eventos: list[Evento] = []
+        self.bots_pausados: set[str] = set()
         self._compras: dict[str, deque] = defaultdict(deque)
 
     # ---------- revisión de órdenes ----------
@@ -69,6 +70,8 @@ class Supervisor:
         # compras
         if self.estado != "activo":
             return Decision(False, f"compras bloqueadas: supervisor {self.estado} ({self.motivo_estado})")
+        if intencion.bot in self.bots_pausados:
+            return Decision(False, "compras bloqueadas: bot pausado por Edgar")
 
         recientes = self._compras[intencion.bot]
         while recientes and ahora - recientes[0] >= timedelta(hours=1):
@@ -112,11 +115,45 @@ class Supervisor:
     def detener_todo(self, ahora: datetime, motivo: str = "orden manual de Edgar") -> None:
         self._cambiar(ahora, "detenido", "detencion", motivo)
 
+    def pausar(self, ahora: datetime, motivo: str = "pausa manual de Edgar") -> None:
+        """Pausa las compras de todos los bots hasta que Edgar reanude."""
+        self.pausado_hasta = None
+        self._cambiar(ahora, "pausado", "pausa", motivo)
+
+    def pausar_bot(self, ahora: datetime, bot: str) -> None:
+        self.bots_pausados.add(bot)
+        self.eventos.append(Evento(ahora, "pausa", f"bot {bot} pausado por Edgar"))
+
+    def reanudar_bot(self, ahora: datetime, bot: str) -> None:
+        self.bots_pausados.discard(bot)
+        self.eventos.append(Evento(ahora, "reanudacion", f"bot {bot} reanudado por Edgar"))
+
     def reanudar(self, ahora: datetime) -> None:
         self.pausado_hasta = None
         if self.ultimo_valor is not None:
             self.valor_maximo = self.ultimo_valor  # se empieza a medir la caída desde aquí
         self._cambiar(ahora, "activo", "reanudacion", "reanudado")
+
+    # ---------- guardar / recuperar (para reinicios) ----------
+    def exportar(self) -> dict:
+        return {
+            "estado": self.estado, "motivo_estado": self.motivo_estado,
+            "pausado_hasta": self.pausado_hasta.isoformat() if self.pausado_hasta else None,
+            "dia_actual": self.dia_actual.isoformat() if self.dia_actual else None,
+            "valor_inicio_dia": self.valor_inicio_dia, "valor_maximo": self.valor_maximo,
+            "ultimo_valor": self.ultimo_valor, "bots_pausados": sorted(self.bots_pausados),
+        }
+
+    def cargar(self, d: dict) -> None:
+        from datetime import date
+        self.estado = d.get("estado", "activo")
+        self.motivo_estado = d.get("motivo_estado", "")
+        self.pausado_hasta = datetime.fromisoformat(d["pausado_hasta"]) if d.get("pausado_hasta") else None
+        self.dia_actual = date.fromisoformat(d["dia_actual"]) if d.get("dia_actual") else None
+        self.valor_inicio_dia = d.get("valor_inicio_dia")
+        self.valor_maximo = d.get("valor_maximo")
+        self.ultimo_valor = d.get("ultimo_valor")
+        self.bots_pausados = set(d.get("bots_pausados", []))
 
     # ---------- internos ----------
     def _reanudar_si_toca(self, ahora: datetime) -> None:
