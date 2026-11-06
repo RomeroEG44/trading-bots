@@ -1,4 +1,6 @@
-# Plan del proyecto: Trading Bots en Binance (BORRADOR v0.1)
+# Plan del proyecto: Trading Bots en Binance (v0.2)
+
+> v0.2: Bot Tendencia en velas diarias y DCA semanal, por los resultados del backtest (`docs/RESULTADOS_BACKTEST.md`).
 
 ## 1. Qué vamos a construir
 
@@ -93,13 +95,15 @@ Regla clave: **ningún bot manda una orden a Binance sin que el supervisor la ap
 | **4. Crecer** | Más bots o estrategias, ajustar parámetros, servidor definitivo. | — | Según decida Edgar |
 
 ## 7. Dónde van a correr los bots
-Esta sesión de Claude es temporal, así que no sirve para correr bots 24/7. Opciones:
+Esta sesión de Claude es temporal y **Binance bloquea su API desde los servidores de Claude**, así que los bots
+que operan no pueden correr aquí (aquí solo se programan y se hacen backtests). Opciones:
 1. **Tu computadora**: gratis, pero debe estar prendida siempre.
-2. **Servidor VPS** (≈ 5-6 USD/mes): recomendado a partir de la Fase 2.
+2. **Servidor VPS** (≈ 5-6 USD/mes) **en un país donde Binance esté permitido**: recomendado a partir de la Fase 2.
 
 ## 8. Lo que Edgar tiene que hacer (checklist)
-- [ ] Conectar GitHub a Claude (ver instrucciones en el chat).
-- [ ] Crear el repositorio vacío `trading-bots` en GitHub.
+- [x] Conectar GitHub a Claude.
+- [x] Crear el repositorio `trading-bots` en GitHub.
+- [ ] Instalar el proyecto en tu PC: `docs/GUIA_INSTALACION.md`.
 - [ ] Crear cuenta en el **Binance Spot Testnet** (testnet.binance.vision) y generar claves de prueba. *(Fase 0)*
 - [ ] Crear un bot de Telegram con @BotFather (te guío paso a paso). *(Fase 2)*
 - [ ] Revisar este plan y responder `docs/PREGUNTAS.md`.

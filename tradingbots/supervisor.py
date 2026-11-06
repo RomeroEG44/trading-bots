@@ -1,0 +1,130 @@
+"""El bot supervisor: aprueba o rechaza cada orden y frena todo si hay demasiadas pérdidas.
+
+Reglas:
+- Las COMPRAS solo se permiten si el supervisor está "activo".
+- Las VENTAS (reducir riesgo, stop-loss) siempre se permiten, aunque esté pausado o detenido.
+- Pérdida diaria > límite  -> "pausado" hasta el siguiente día (UTC); se reanuda solo.
+- Caída desde el máximo > límite -> "detenido"; solo Edgar puede reanudar.
+"""
+from __future__ import annotations
+
+from collections import defaultdict, deque
+from dataclasses import dataclass, field, replace
+from datetime import datetime, timedelta
+
+from .modelos import Cartera, Intencion
+
+
+@dataclass
+class LimitesRiesgo:
+    pares_permitidos: list[str]
+    orden_minima_usdt: float = 5.0  # mínimo que acepta Binance
+    orden_maxima_usdt: float = 50.0
+    max_compras_por_hora: int = 4
+    perdida_diaria_max_pct: float = 3.0
+    caida_maxima_pct: float = 10.0
+
+
+@dataclass
+class Decision:
+    aprobada: bool
+    motivo: str
+    intencion: Intencion | None = None
+
+
+@dataclass
+class Evento:
+    tiempo: datetime
+    tipo: str  # "pausa", "detencion", "reanudacion"
+    mensaje: str
+
+
+class Supervisor:
+    def __init__(self, limites: LimitesRiesgo):
+        self.limites = limites
+        self.estado = "activo"  # activo | pausado | detenido
+        self.motivo_estado = ""
+        self.pausado_hasta: datetime | None = None
+        self.dia_actual = None
+        self.valor_inicio_dia: float | None = None
+        self.valor_maximo: float | None = None
+        self.ultimo_valor: float | None = None
+        self.eventos: list[Evento] = []
+        self._compras: dict[str, deque] = defaultdict(deque)
+
+    # ---------- revisión de órdenes ----------
+    def revisar(self, intencion: Intencion, cartera: Cartera, precio: float, ahora: datetime) -> Decision:
+        self._reanudar_si_toca(ahora)
+        lim = self.limites
+
+        if intencion.par not in lim.pares_permitidos:
+            return Decision(False, f"par {intencion.par} no está en la lista permitida")
+
+        if intencion.lado == "venta":
+            cantidad = min(intencion.cantidad or 0.0, cartera.cantidad)
+            if cantidad * precio < lim.orden_minima_usdt:
+                return Decision(False, "venta menor al mínimo de Binance")
+            return Decision(True, "venta aprobada", replace(intencion, cantidad=cantidad))
+
+        # compras
+        if self.estado != "activo":
+            return Decision(False, f"compras bloqueadas: supervisor {self.estado} ({self.motivo_estado})")
+
+        recientes = self._compras[intencion.bot]
+        while recientes and ahora - recientes[0] >= timedelta(hours=1):
+            recientes.popleft()
+        if len(recientes) >= lim.max_compras_por_hora:
+            return Decision(False, "demasiadas compras en la última hora")
+
+        monto = min(intencion.monto_usdt or 0.0, lim.orden_maxima_usdt, cartera.efectivo)
+        if monto < lim.orden_minima_usdt:
+            if cartera.efectivo < lim.orden_minima_usdt:
+                return Decision(False, "presupuesto del bot agotado")
+            return Decision(False, "compra menor al mínimo de Binance")
+
+        recientes.append(ahora)
+        return Decision(True, "compra aprobada", replace(intencion, monto_usdt=monto))
+
+    # ---------- vigilancia del valor total ----------
+    def actualizar_valor(self, ahora: datetime, valor_total: float) -> None:
+        self._reanudar_si_toca(ahora)
+        self.ultimo_valor = valor_total
+        if ahora.date() != self.dia_actual:
+            self.dia_actual = ahora.date()
+            self.valor_inicio_dia = valor_total
+        self.valor_maximo = valor_total if self.valor_maximo is None else max(self.valor_maximo, valor_total)
+
+        if self.estado == "detenido":
+            return
+        caida = 1 - valor_total / self.valor_maximo
+        if caida * 100 >= self.limites.caida_maxima_pct:
+            self._cambiar(ahora, "detenido", "detencion",
+                          f"caída de {caida:.1%} desde el máximo ({self.valor_maximo:.2f} → {valor_total:.2f} USDT)")
+            return
+        if self.estado == "activo":
+            perdida_dia = 1 - valor_total / self.valor_inicio_dia
+            if perdida_dia * 100 >= self.limites.perdida_diaria_max_pct:
+                manana = datetime.combine(ahora.date() + timedelta(days=1), datetime.min.time(), tzinfo=ahora.tzinfo)
+                self.pausado_hasta = manana
+                self._cambiar(ahora, "pausado", "pausa", f"pérdida de {perdida_dia:.1%} en el día")
+
+    # ---------- comandos de Edgar ----------
+    def detener_todo(self, ahora: datetime, motivo: str = "orden manual de Edgar") -> None:
+        self._cambiar(ahora, "detenido", "detencion", motivo)
+
+    def reanudar(self, ahora: datetime) -> None:
+        self.pausado_hasta = None
+        if self.ultimo_valor is not None:
+            self.valor_maximo = self.ultimo_valor  # se empieza a medir la caída desde aquí
+        self._cambiar(ahora, "activo", "reanudacion", "reanudado")
+
+    # ---------- internos ----------
+    def _reanudar_si_toca(self, ahora: datetime) -> None:
+        if self.estado == "pausado" and self.pausado_hasta and ahora >= self.pausado_hasta:
+            self.pausado_hasta = None
+            self._cambiar(ahora, "activo", "reanudacion", "nuevo día: se reanudan las compras")
+
+    def _cambiar(self, ahora: datetime, estado: str, tipo: str, mensaje: str) -> None:
+        self.estado = estado
+        self.motivo_estado = mensaje if estado != "activo" else ""
+        self.eventos.append(Evento(ahora, tipo, mensaje))

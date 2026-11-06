@@ -1,0 +1,41 @@
+# Configuración para PRUEBAS (backtest y Testnet). Capital ficticio de 1,000 USDT por bot.
+comision_pct: 0.1          # comisión de Binance por operación
+deslizamiento_pct: 0.05    # el precio real sale un poco peor que el ideal
+
+riesgo:
+  pares_permitidos: [BTC/USDT, ETH/USDT]
+  orden_minima_usdt: 5
+  orden_maxima_usdt: 1000
+  max_compras_por_hora: 4
+  perdida_diaria_max_pct: 3     # pausa todo el resto del día
+  caida_maxima_pct: 10          # detiene todo hasta que Edgar reanude
+
+bots:
+  - nombre: dca_btc
+    estrategia: dca
+    par: BTC/USDT
+    temporalidad: 1h
+    presupuesto_usdt: 1000
+    parametros:
+      monto_usdt: 10
+      cada_horas: 168        # una vez por semana: el presupuesto alcanza ~2 años
+      caida_para_doble_pct: 5
+      multiplicador_caida: 2
+      toma_ganancia_pct: 15
+      fraccion_venta: 0.25
+
+  - nombre: tendencia_eth
+    estrategia: tendencia
+    par: ETH/USDT
+    temporalidad: 1d          # velas diarias: en 1h y 4h las comisiones se comían todo (ver reports/)
+    presupuesto_usdt: 1000
+    parametros:
+      ema_rapida: 9
+      ema_lenta: 21
+      rsi_min: 50
+      rsi_max: 70
+      stop_loss_pct: 3
+      take_profit_pct: 6
+      trailing_activacion_pct: 3
+      trailing_pct: 2
+      fraccion_capital: 0.9

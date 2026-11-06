@@ -1,0 +1,35 @@
+# Configuración para DINERO REAL (Fase 3). Total ~40 USD. NO usar antes de completar la Fase 2.
+comision_pct: 0.1
+deslizamiento_pct: 0.05
+
+riesgo:
+  pares_permitidos: [BTC/USDT, ETH/USDT]
+  orden_minima_usdt: 5          # Binance no acepta órdenes más pequeñas
+  orden_maxima_usdt: 20
+  max_compras_por_hora: 2
+  perdida_diaria_max_pct: 3
+  caida_maxima_pct: 10
+
+bots:
+  - nombre: dca_btc
+    estrategia: dca
+    par: BTC/USDT
+    temporalidad: 1h
+    presupuesto_usdt: 20
+    parametros:
+      monto_usdt: 5
+      cada_horas: 168        # una vez por semana
+      caida_para_doble_pct: 5
+      multiplicador_caida: 2
+      toma_ganancia_pct: 15
+      fraccion_venta: 0.25
+
+  - nombre: tendencia_eth
+    estrategia: tendencia
+    par: ETH/USDT
+    temporalidad: 1d          # velas diarias: en 1h y 4h las comisiones se comían todo (ver reports/)
+    presupuesto_usdt: 20
+    parametros:
+      stop_loss_pct: 3
+      take_profit_pct: 6
+      fraccion_capital: 0.9
