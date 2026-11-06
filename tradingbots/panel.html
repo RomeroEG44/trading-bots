@@ -3,156 +3,214 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Centro de Control</title>
+<title>Sala de Bots</title>
 <script src="/static/chart.umd.min.js"></script>
 <style>
   :root {
-    --bg: #f4f4f2; --surface: #fcfcfb; --surface-2: #f0efec; --border: #e3e2de;
-    --text: #0b0b0b; --text-2: #52514e; --muted: #7a7974; --grid: #ecebe7;
-    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
-    --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
-    --good-bg: #e6f6e6; --warning-bg: #fff5dc; --critical-bg: #fbe9e9; --info-bg: #e7f0fb;
-    --sel: #e7f0fb;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #111110; --surface: #1a1a19; --surface-2: #232321; --border: #2e2e2c;
-      --text: #f0efec; --text-2: #c3c2b7; --muted: #8f8e86; --grid: #2a2a28;
-      --s1: #3987e5; --s2: #d95926; --s3: #199e70;
-      --good-bg: #13301a; --warning-bg: #3a2e10; --critical-bg: #3d1717; --info-bg: #15263b; --sel: #172636;
-    }
+    --bg: #0b0a12; --surface: #15131f; --surface-2: #1d1a2a; --border: #2a2638; --grid: #232031;
+    --text: #f0eef6; --text-2: #c3bfd4; --muted: #8d89a0;
+    --neon: #e2459d; --neon-2: #9085e9;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s7: #9085e9;
+    --good: #2fbf71; --warning: #fab219; --critical: #e66767;
+    --good-bg: rgba(47,191,113,.14); --warning-bg: rgba(250,178,25,.14); --critical-bg: rgba(230,103,103,.16); --info-bg: rgba(57,135,229,.16);
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  .wrap { max-width: 1320px; margin: 0 auto; padding: 18px 16px 48px; }
-  header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
-  h1 { font-size: 21px; margin: 0 auto 0 0; }
-  h2 { font-size: 14px; margin: 0; color: var(--text-2); font-weight: 650; }
-  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px;
-          font-size: 12.5px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); white-space: nowrap; }
-  .good { background: var(--good-bg) !important; } .warning { background: var(--warning-bg) !important; }
-  .critical { background: var(--critical-bg) !important; } .info { background: var(--info-bg) !important; }
+  html { color-scheme: dark; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 14px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: 12px;
+           border: 1px solid var(--neon); border-radius: 12px; background: linear-gradient(90deg, rgba(226,69,157,.18), rgba(144,133,233,.08)); }
+  h1 { font: 800 19px/1 var(--mono); letter-spacing: .5px; margin: 0 auto 0 0; }
+  h2 { font: 700 12.5px/1.2 var(--mono); text-transform: uppercase; letter-spacing: .6px; margin: 0; color: var(--text-2); }
+  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 650;
+          border: 1px solid var(--border); background: var(--surface); white-space: nowrap; }
+  .good { background: var(--good-bg) !important; color: var(--good); } .warning { background: var(--warning-bg) !important; color: var(--warning); }
+  .critical { background: var(--critical-bg) !important; color: var(--critical); } .info { background: var(--info-bg) !important; color: #8bb8f0; }
+  .reloj { font: 700 15px var(--mono); padding: 3px 9px; border-radius: 8px; background: #000; border: 1px solid var(--border); }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; min-width: 0; }
   .grid { display: grid; gap: 12px; margin-bottom: 12px; }
-  .kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-  .kpi .lbl { color: var(--text-2); font-size: 12.5px; }
-  .kpi .val { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; }
-  .kpi .sub { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
-  .pos { color: var(--good); } .neg { color: var(--critical); }
   .head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
   .head .right { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
-  button { font: inherit; font-size: 13px; padding: 6px 11px; border-radius: 8px; cursor: pointer;
-           border: 1px solid var(--border); background: var(--bg); color: var(--text); white-space: nowrap; }
+  .pos { color: var(--good); } .neg { color: var(--critical); }
+  .meta { color: var(--muted); font-size: 12px; }
+  .num { font-variant-numeric: tabular-nums; }
+  button { font: inherit; font-size: 12.5px; padding: 5px 10px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border);
+           background: var(--surface-2); color: var(--text); white-space: nowrap; }
   button:hover { border-color: var(--text-2); }
-  button.on { background: var(--text); color: var(--surface); border-color: var(--text); }
-  button.danger { background: var(--critical); color: #fff; border-color: var(--critical); font-weight: 600; }
+  button.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+  button.danger { background: #b4232a; border-color: #b4232a; color: #fff; font-weight: 700; }
+  .fila1 { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+  .wallet { border: none; background: linear-gradient(135deg, #ff7a2f 0%, #e2459d 55%, #6b2fb3 100%); color: #fff; position: relative; overflow: hidden; }
+  .wallet .lbl { font-size: 12.5px; opacity: .9; }
+  .wallet .big { font: 800 38px/1.1 system-ui; margin: 4px 0 6px; font-variant-numeric: tabular-nums; }
+  .wallet .chip { display: inline-block; padding: 2px 8px; border-radius: 6px; background: rgba(0,0,0,.28); font-weight: 700; font-size: 12.5px; }
+  .meta-bar { margin-top: 16px; }
+  .meta-bar .track { position: relative; height: 8px; border-radius: 99px; background: rgba(0,0,0,.3); }
+  .meta-bar .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: #fff; }
+  .meta-bar .hito { position: absolute; top: -5px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%;
+                    background: rgba(0,0,0,.35); border: 2px solid rgba(255,255,255,.7); }
+  .meta-bar .hito.ok { background: #2fbf71; border-color: #fff; }
+  .meta-bar .marcas { position: relative; height: 16px; font-size: 11px; margin-top: 6px; }
+  .meta-bar .marcas span { position: absolute; transform: translateX(-50%); }
+  .equipo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 1000px) { .fila1 { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 640px) { .equipo { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .rol { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+  .rol .t { display: flex; align-items: center; gap: 7px; font: 800 13px var(--mono); letter-spacing: .4px; }
+  .rol .ic { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; font-size: 13px; flex: none; }
+  .rol .sub { color: var(--muted); font-size: 11.5px; margin: 2px 0 6px; }
+  .rol .m { font: 700 15px var(--mono); }
+  .rol .q { margin-top: 6px; font: 12px var(--mono); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agentes { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .agente { cursor: pointer; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; transition: border-color .2s; }
+  .agente:hover { border-color: var(--text-2); }
+  .agente.sel { border-color: var(--neon); box-shadow: 0 0 0 1px var(--neon) inset; }
+  .agente .av { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-size: 21px; grid-row: span 2; }
+  .agente .nom { font-weight: 750; font-size: 15px; }
+  .agente .que { font: 12px var(--mono); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agente .res { text-align: right; grid-row: span 2; }
+  .agente .res .p { font: 800 21px var(--mono); }
+  .agente svg { grid-column: 1 / -1; width: 100%; height: 42px; }
+  .agente .pie { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .fila3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  @media (max-width: 1000px) { .fila3, .fila4, .fila5 { grid-template-columns: minmax(0, 1fr) !important; } }
+  #sala { width: 100%; height: auto; display: block; }
+  #sala .linea { stroke: var(--border); stroke-width: 1.5; }
+  #sala .linea.activa { stroke: var(--neon); stroke-width: 2.5; stroke-dasharray: 6 5; animation: flujo 1s linear infinite; }
+  #sala .linea.caza { stroke: var(--s3); stroke-width: 1.8; stroke-dasharray: 3 6; animation: flujo 1.6s linear infinite; }
+  @keyframes flujo { to { stroke-dashoffset: -22; } }
+  #sala .nodo circle { stroke: var(--bg); stroke-width: 3; }
+  #sala .nodo.pulso circle { animation: pulso 1.4s ease-in-out infinite; }
+  @keyframes pulso { 50% { stroke: var(--neon); stroke-width: 6; } }
+  #sala text { fill: var(--text); font-family: system-ui; }
+  #sala .bur rect { fill: #000; stroke: var(--border); }
+  #sala .bur text { fill: var(--text-2); font: 11px var(--mono); }
+  .chart-box { position: relative; height: 250px; }
+  .analisis { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip { font: 11.5px var(--mono); padding: 2px 7px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); }
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; color: var(--text-2); font-weight: 600; font-size: 12.5px; padding: 6px 8px;
+  th { text-align: left; color: var(--muted); font: 600 11.5px var(--mono); text-transform: uppercase; padding: 6px 8px;
        border-bottom: 1px solid var(--border); white-space: nowrap; }
-  td { padding: 8px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
   td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  #bots-tabla { min-width: 1080px; }
-  #bots-tabla tbody tr { cursor: pointer; }
-  #bots-tabla tbody tr:hover { background: var(--surface-2); }
-  #bots-tabla tbody tr.sel { background: var(--sel); }
-  .nombre { font-weight: 650; } .meta { color: var(--muted); font-size: 12px; }
-  .two { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
-  @media (max-width: 900px) { .two { grid-template-columns: minmax(0, 1fr); } }
-  .chart-box { position: relative; height: 270px; }
-  .analisis { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .chip { font-size: 12px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border);
-          font-variant-numeric: tabular-nums; background: var(--surface); }
-  dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0 12px; }
-  dl.kv dt { color: var(--text-2); } dl.kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
-  .feed { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
-  .feed li { padding: 7px 0; border-bottom: 1px solid var(--grid); display: flex; gap: 8px; }
-  .feed .ic { flex: none; width: 20px; text-align: center; }
-  .feed .t { color: var(--muted); font-size: 11.5px; }
-  .tag { font-size: 11.5px; font-weight: 650; padding: 1px 7px; border-radius: 6px; white-space: nowrap; }
-  .empty { color: var(--muted); padding: 10px 0; }
+  .fila4 { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+  #mercados { min-width: 820px; }
+  .barras { display: flex; gap: 3px; align-items: flex-end; height: 18px; }
+  .barras i { display: block; width: 9px; border-radius: 2px 2px 0 0; }
+  .fil { font: 12px var(--mono); }
+  .umbrales { font: 12.5px/1.75 var(--mono); }
+  .umbrales .sec { color: var(--neon); margin-top: 10px; font-weight: 700; }
+  .umbrales .r { display: flex; gap: 10px; } .umbrales .r .k { color: var(--text-2); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fila5 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .lista { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+  .lista li { padding: 7px 0; border-bottom: 1px solid var(--grid); display: flex; gap: 10px; align-items: center; }
+  .lista .ic { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; }
+  .lista .tx { flex: 1; min-width: 0; }
+  .lista .t { color: var(--muted); font-size: 11.5px; }
+  .lista .v { font: 700 14px var(--mono); white-space: nowrap; }
+  .tag { font: 700 11px var(--mono); padding: 1px 7px; border-radius: 6px; white-space: nowrap; }
   #ops-tabla { min-width: 860px; }
-  .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text);
-           color: var(--surface); padding: 10px 16px; border-radius: 8px; display: none; z-index: 9; }
-  .vivo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); display: inline-block; }
-  .vivo-dot.off { background: var(--critical); }
+  .vivo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); display: inline-block; box-shadow: 0 0 8px var(--good); }
+  .vivo-dot.off { background: var(--critical); box-shadow: none; }
+  .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
+           padding: 10px 16px; border-radius: 8px; display: none; z-index: 9; }
+  .empty { color: var(--muted); padding: 10px 0; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>🤖 Centro de Control</h1>
+    <h1>🤖 SALA DE BOTS</h1>
     <span id="modo" class="pill">—</span>
-    <span id="sup" class="pill">—</span>
+    <span id="esc" class="pill">📡 —</span>
     <span id="latido" class="pill"><span class="vivo-dot off"></span> Conectando…</span>
+    <span id="reloj" class="reloj">--:--:-- UTC</span>
     <button class="danger" onclick="if(confirm('Freno de emergencia: detener TODAS las compras. ¿Seguro?')) cmd('detener_todo')">🛑 Detener todo</button>
   </header>
 
-  <section class="grid kpis">
-    <div class="card kpi"><div class="lbl">Valor total</div><div class="val" id="k-total">—</div><div class="sub" id="k-total-sub"></div></div>
-    <div class="card kpi"><div class="lbl">Resultado</div><div class="val" id="k-res">—</div><div class="sub" id="k-res-sub"></div></div>
-    <div class="card kpi"><div class="lbl">Ganancia realizada</div><div class="val" id="k-real">—</div><div class="sub" id="k-real-sub"></div></div>
-    <div class="card kpi"><div class="lbl">Operaciones</div><div class="val" id="k-ops">—</div><div class="sub" id="k-ops-sub"></div></div>
-    <div class="card kpi"><div class="lbl">Acierto global</div><div class="val" id="k-acierto">—</div><div class="sub" id="k-acierto-sub"></div></div>
-  </section>
-
-  <section class="card" style="margin-bottom:12px">
-    <div class="head"><h2>Bots en paralelo · ordenados por resultado</h2>
-      <span class="meta" style="margin-left:auto">Clic en un bot para ver su análisis</span></div>
-    <div class="table-wrap">
-      <table id="bots-tabla">
-        <thead><tr>
-          <th>Bot</th><th>Master</th><th class="n">Tamaño</th><th class="n">Resultado</th><th class="n">Ops</th>
-          <th class="n">Acierto</th><th class="n">Factor</th><th class="n">Peor caída</th><th class="n">Comisiones</th>
-          <th>Señal ahora</th>
-        </tr></thead>
-        <tbody id="bots"></tbody>
-      </table>
+  <section class="grid fila1">
+    <div class="card wallet">
+      <div class="lbl">Billetera de los bots · disponible para operar</div>
+      <div class="big" id="w-total">—</div>
+      <span class="chip" id="w-pl">—</span> <span class="chip" id="w-x">—</span>
+      <div class="meta" style="color:rgba(255,255,255,.85);margin-top:8px" id="w-sub"></div>
+      <div class="meta-bar">
+        <div class="lbl">Meta</div>
+        <div class="track"><div class="fill" id="w-fill"></div><div id="w-hitos"></div></div>
+        <div class="marcas" id="w-marcas"></div>
+      </div>
     </div>
+    <div class="equipo" id="equipo"></div>
   </section>
 
-  <section class="grid two">
+  <div class="head"><h2>Agentes · clic para ver su análisis</h2><span class="meta right" id="agentes-sub"></span></div>
+  <section class="grid agentes" id="agentes"></section>
+
+  <section class="grid fila3">
+    <div class="card">
+      <div class="head"><h2>La sala · quién habla con quién</h2><span class="meta right">— Master corrige · ┅ Escáner manda mercados</span></div>
+      <svg id="sala" viewBox="0 0 800 400" role="img" aria-label="Diagrama del Master, el Escáner y los bots"></svg>
+    </div>
     <div class="card">
       <div class="head"><h2 id="det-titulo">—</h2><div class="right" id="det-acciones"></div></div>
-      <div class="chart-box"><canvas id="g-precio" aria-label="Precio del par del bot con sus compras y ventas"></canvas></div>
+      <div class="chart-box"><canvas id="g-precio" aria-label="Precio del mercado del bot con sus compras y ventas"></canvas></div>
       <div class="analisis"><b>Análisis:</b> <span id="det-analisis">—</span><div class="chips" id="det-ind"></div></div>
-    </div>
-    <div class="card">
-      <div class="head"><h2>🧠 Master sobre este bot</h2></div>
-      <dl class="kv" id="det-master"></dl>
-      <div class="meta" style="margin-bottom:6px">Feedback reciente para este bot</div>
-      <ul class="feed" id="det-feed" style="max-height:220px"></ul>
+      <div class="meta" style="margin-top:8px" id="det-master"></div>
     </div>
   </section>
 
-  <section class="grid two">
+  <section class="grid fila4">
     <div class="card">
-      <div class="head"><h2>Valor total de la cartera (USDT)</h2>
+      <div class="head"><h2>Mercados vigilados</h2><span class="meta right" id="merc-sub"></span></div>
+      <div class="table-wrap">
+        <table id="mercados">
+          <thead><tr><th>Mercado</th><th class="n">Precio</th><th class="n">24 h</th><th class="n">Volumen</th><th class="n">Rango</th>
+            <th>Impulso · Caída · Volátil</th><th>Filtros</th><th>Bots</th></tr></thead>
+          <tbody id="merc"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="merc-vacio">El Escáner todavía no corre (arranca con los cazadores).</div>
+    </div>
+    <div class="card">
+      <div class="head"><h2>umbrales.py · lo que el equipo cree</h2></div>
+      <div class="umbrales" id="umbrales"></div>
+    </div>
+  </section>
+
+  <section class="grid fila5">
+    <div class="card">
+      <div class="head"><h2>Cerradas</h2><span class="pill" id="n-cerradas">0</span><span class="meta right" id="cerr-sub"></span></div>
+      <ul class="lista" id="cerradas" style="max-height:330px"></ul>
+    </div>
+    <div class="card">
+      <div class="head"><h2>Lo que dice el equipo · en vivo</h2>
+        <div class="right" id="filtro-feed"><button data-f="todo" class="on">Todo</button><button data-f="acciones">Solo acciones</button></div>
+      </div>
+      <ul class="lista" id="feed" style="max-height:330px"></ul>
+    </div>
+  </section>
+
+  <section class="grid fila5">
+    <div class="card">
+      <div class="head"><h2>Balance total (USDT)</h2>
         <div class="right" id="rangos"><button data-h="6">6 h</button><button data-h="24" class="on">24 h</button><button data-h="168">7 d</button></div>
       </div>
-      <div class="chart-box"><canvas id="g-total" aria-label="Valor total de la cartera en el tiempo"></canvas></div>
+      <div class="chart-box"><canvas id="g-total" aria-label="Valor total de la billetera en el tiempo"></canvas></div>
       <div class="empty" id="g-total-vacia" style="display:none">Se guarda un punto por minuto; la gráfica aparece en cuanto haya 2.</div>
     </div>
     <div class="card">
-      <div class="head"><h2>🧠 Feedback del Master y Supervisor · en vivo</h2>
-        <div class="right" id="filtro-feed"><button data-f="todo" class="on">Todo</button><button data-f="acciones">Solo acciones</button></div>
+      <div class="head"><h2>Operaciones en vivo</h2></div>
+      <div class="table-wrap">
+        <table id="ops-tabla">
+          <thead><tr><th>Hora</th><th>Bot</th><th>Mercado</th><th>Lado</th><th class="n">Precio</th><th class="n">USDT</th><th class="n">Resultado</th><th>¿Por qué?</th></tr></thead>
+          <tbody id="ops"></tbody>
+        </table>
       </div>
-      <ul class="feed" id="feed" style="max-height:290px"></ul>
+      <div class="empty" id="ops-vacio" style="display:none">Aún no hay operaciones.</div>
     </div>
-  </section>
-
-  <section class="card">
-    <div class="head"><h2>Operaciones en vivo (todos los bots)</h2></div>
-    <div class="table-wrap">
-      <table id="ops-tabla">
-        <thead><tr><th>Hora</th><th>Bot</th><th>Lado</th><th class="n">Precio</th><th class="n">USDT</th>
-          <th class="n">Resultado</th><th>¿Por qué?</th></tr></thead>
-        <tbody id="ops"></tbody>
-      </table>
-    </div>
-    <div class="empty" id="ops-vacio" style="display:none">Aún no hay operaciones.</div>
   </section>
 </div>
 <div class="toast" id="toast"></div>
@@ -161,214 +219,299 @@
 const $ = (id) => document.getElementById(id);
 const nf = (d) => new Intl.NumberFormat("es-MX", { minimumFractionDigits: d, maximumFractionDigits: d });
 const fmt = (x, d = 2) => (x == null ? "—" : nf(d).format(x));
+const fmtP = (x) => { if (x == null) return "—"; const a = Math.abs(x); return a >= 100 ? fmt(x, 2) : a >= 1 ? fmt(x, 4) : Number(x).toPrecision(5); };
 const signo = (x, d = 2) => (x == null ? "—" : (x >= 0 ? "+" : "") + nf(d).format(x));
 const cls = (x) => (x == null ? "" : x >= 0 ? "pos" : "neg");
 const pct = (x) => (x == null ? "—" : Math.round(x * 100) + " %");
+const abrev = (x) => x >= 1e9 ? fmt(x / 1e9, 1) + " B" : x >= 1e6 ? fmt(x / 1e6, 1) + " M" : fmt(x / 1e3, 0) + " k";
 const hora = (iso) => new Date(iso).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const hace = (seg) => seg == null ? "" : seg < 90 ? Math.round(seg) + " s" : seg < 5400 ? Math.round(seg / 60) + " min" : fmt(seg / 3600, 1) + " h";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const ICONOS = { master_info: "🧠", master_accion: "🔧", master_alerta: "🚨", pausa: "⏸️", detencion: "🛑",
-                 reanudacion: "▶️", rechazo: "✋", error: "⚠️", inicio: "🤖", fin: "⏹️", info: "ℹ️" };
-const SENAL = { compra: ["good", "▲ Señal de compra"], en_posicion: ["info", "● En posición"], espera: ["", "… Esperando"] };
-const MASTER = { activo: ["good", "Activo"], enfriamiento: ["warning", "⏳ Enfriamiento"], cuarentena: ["critical", "🚑 Cuarentena"], retirado: ["critical", "🚫 Retirado"] };
-let horas = 24, seleccionado = null, filtroFeed = "todo", ultimo = null, gPrecio = null, gTotal = null;
+const moneda = (par) => (par || "").split("/")[0];
+
+const AVATAR = { tendencia: ["🎯", "--s1"], ruptura: ["🚀", "--s7"], reversion: ["🎣", "--s3"], volumen: ["🐋", "--s5"],
+                 rejilla: ["🧱", "--s4"], dca: ["🪙", "--s2"] };
+const ESTADO = { en_posicion: ["info", "EN POSICIÓN"], compra: ["good", "SEÑAL"], espera: ["", "VIGILANDO"], buscando: ["", "CAZANDO"] };
+const MASTER = { activo: null, enfriamiento: ["warning", "⏳ ENFRIANDO"], cuarentena: ["critical", "🚑 CUARENTENA"], retirado: ["critical", "🚫 RETIRADO"] };
+const ICONOS = { master_info: "🧠", master_accion: "🔧", master_alerta: "🚨", pausa: "⏸️", detencion: "🛑", reanudacion: "▶️",
+                 rechazo: "✋", error: "⚠️", inicio: "🤖", fin: "⏹️", info: "📡" };
+const METAS = [5, 10, 25];
+let horas = 24, seleccionado = null, filtroFeed = "todo", D = null, gPrecio = null, gTotal = null;
 
 function toast(t) { const el = $("toast"); el.textContent = t; el.style.display = "block"; setTimeout(() => el.style.display = "none", 3000); }
 async function cmd(accion, bot = null) {
   const r = await fetch("/api/comando", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accion, bot }) });
   toast(r.ok ? "Enviado: se aplica en segundos." : "No se pudo enviar");
 }
+setInterval(() => { $("reloj").textContent = new Date().toISOString().slice(11, 19) + " UTC"; }, 1000);
 
-function opcionesEjes(tickX) {
-  const texto = css("--text-2"), rejilla = css("--grid");
+function ejes(tickX) {
+  const t = css("--muted"), g = css("--grid");
   return {
-    x: { type: "linear", grid: { display: false }, border: { color: rejilla }, ticks: { color: texto, maxTicksLimit: 6, callback: tickX } },
-    y: { grid: { color: rejilla }, border: { display: false },
-         ticks: { color: texto, maxTicksLimit: 5, callback: function (v) {
-           const t = this.ticks, paso = t.length > 1 ? Math.abs(t[1].value - t[0].value) : 1;
-           return fmt(v, paso >= 1 ? 0 : paso >= 0.1 ? 1 : paso >= 0.01 ? 2 : 3); } } },
+    x: { type: "linear", grid: { display: false }, border: { color: g }, ticks: { color: t, maxTicksLimit: 6, callback: tickX } },
+    y: { grid: { color: g }, border: { display: false }, ticks: { color: t, maxTicksLimit: 5, callback: function (v) {
+      const k = this.ticks, paso = k.length > 1 ? Math.abs(k[1].value - k[0].value) : 1;
+      return paso >= 1 ? fmt(v, 0) : paso >= 0.01 ? fmt(v, paso >= 0.1 ? 1 : 2) : Number(v).toPrecision(4); } } },
   };
 }
 
-function cabecera(v, ahora) {
+function cabecera(v) {
   $("modo").className = "pill " + (v.modo === "real" ? "critical" : "info");
-  $("modo").textContent = (v.modo === "real" ? "💵 REAL" : v.modo === "testnet" ? "🧪 TESTNET" : "📄 PAPEL");
-  const s = v.supervisor;
-  const m = { activo: ["good", "🛡️ Supervisor activo"], pausado: ["warning", "⏸️ Supervisor: pausa"], detenido: ["critical", "🛑 Supervisor: detenido"] }[s.estado];
-  $("sup").className = "pill " + m[0]; $("sup").textContent = m[1]; $("sup").title = s.motivo || "";
-  const seg = Math.max(0, Math.round((new Date(ahora) - new Date(v.latido)) / 1000)), vivo = seg < 30;
+  $("modo").textContent = v.modo === "real" ? "💵 REAL" : v.modo === "testnet" ? "🧪 TESTNET" : "📄 PAPEL";
+  const e = v.escaner;
+  $("esc").textContent = e && e.escaneados ? `📡 ${e.escaneados} mercados · ${e.aprobados} pasan filtros` : "📡 Escáner en espera";
+  const seg = Math.max(0, (new Date(D.ahora) - new Date(v.latido)) / 1000), vivo = seg < 30;
   $("latido").className = "pill " + (vivo ? "good" : "critical");
-  $("latido").innerHTML = `<span class="vivo-dot ${vivo ? "" : "off"}"></span> ${vivo ? "En vivo" : "Sin señal"} · hace ${seg < 90 ? seg + " s" : Math.round(seg / 60) + " min"}`;
+  $("latido").innerHTML = `<span class="vivo-dot ${vivo ? "" : "off"}"></span> ${vivo ? "EN VIVO" : "SIN SEÑAL"} · ${hace(seg)}`;
 }
 
-function kpis(d) {
-  const v = d.en_vivo, g = d.global, res = v.total - v.presupuesto;
-  $("k-total").textContent = fmt(v.total);
-  $("k-total-sub").textContent = `USDT · inicial ${fmt(v.presupuesto)} · ${v.bots.length} bots`;
-  $("k-res").innerHTML = `<span class="${cls(res)}">${signo(res)}</span>`;
-  $("k-res-sub").textContent = signo((v.total / v.presupuesto - 1) * 100) + " %";
-  $("k-real").innerHTML = `<span class="${cls(g.ganancia_realizada)}">${signo(g.ganancia_realizada)}</span>`;
-  $("k-real-sub").textContent = `comisiones pagadas ${fmt(g.comisiones)}`;
-  $("k-ops").textContent = g.operaciones;
-  $("k-ops-sub").textContent = `${g.compras} compras · ${g.ventas} ventas · volumen ${fmt(g.volumen, 0)}`;
-  $("k-acierto").textContent = pct(g.tasa_acierto);
-  $("k-acierto-sub").textContent = `${g.ganadoras} de ${g.ventas} ventas ganadoras · factor ${g.factor_infinito ? "∞" : fmt(g.factor_beneficio)}`;
+function billetera(v) {
+  const r = (v.total / v.presupuesto - 1) * 100;
+  $("w-total").textContent = "$" + fmt(v.total);
+  $("w-pl").textContent = `${signo(v.total - v.presupuesto)} USDT (${signo(r)} %)`;
+  $("w-x").textContent = "x" + fmt(v.total / v.presupuesto, 3) + " desde el inicio";
+  const g = D.global;
+  $("w-sub").textContent = `Inicial $${fmt(v.presupuesto, 0)} · ${v.bots.length} bots · ${g.ventas} cierres · acierto ${pct(g.tasa_acierto)} · comisiones $${fmt(g.comisiones)}`;
+  const max = METAS[METAS.length - 1] * 1.15, pos = (x) => Math.max(0, Math.min(100, (x / max) * 100));
+  $("w-fill").style.width = pos(r) + "%";
+  $("w-hitos").innerHTML = METAS.map((m) => `<span class="hito ${r >= m ? "ok" : ""}" style="left:${pos(m)}%" title="Meta +${m} %"></span>`).join("");
+  $("w-marcas").innerHTML = METAS.map((m) => `<span style="left:${pos(m)}%">+${m} %</span>`).join("");
 }
 
-function tablaBots(d) {
-  const filas = d.en_vivo.bots.map((b) => ({ b, m: d.metricas[b.nombre] || {}, r: b.valor / b.presupuesto - 1 }))
-    .sort((x, y) => y.r - x.r);
-  if (!seleccionado || !filas.some((f) => f.b.nombre === seleccionado)) seleccionado = filas[0]?.b.nombre;
-  $("bots").innerHTML = filas.map(({ b, m, r }) => {
-    const ms = b.pausado ? ["warning", "⏸️ Pausado (manual)"] : MASTER[b.master.estado];
-    const sn = SENAL[b.analisis?.senal] || SENAL.espera;
-    const titulo = b.master.estado !== "activo" ? `${b.master.motivo} · hasta ${hora(b.master.hasta)}` : b.master.nota;
-    return `<tr class="${b.nombre === seleccionado ? "sel" : ""}" data-bot="${esc(b.nombre)}">
-      <td><div class="nombre">${esc(b.nombre)}</div><div class="meta">${esc(b.descripcion)} · ${esc(b.par)} · ${esc(b.temporalidad)}</div></td>
-      <td><span class="pill ${ms[0]}" title="${esc(titulo)}">${ms[1]}</span></td>
-      <td class="n">x${fmt(b.master.tamano)}</td>
-      <td class="n"><span class="${cls(r)}">${signo(b.valor - b.presupuesto)}</span><div class="meta">${signo(r * 100)} %</div></td>
-      <td class="n">${m.operaciones ?? 0}</td>
-      <td class="n">${pct(m.tasa_acierto)}<div class="meta">${m.ganadoras ?? 0}/${m.ventas ?? 0}</div></td>
-      <td class="n">${m.factor_infinito ? "∞" : fmt(m.factor_beneficio)}</td>
-      <td class="n">${m.caida_maxima_pct >= 0.05 ? "−" + fmt(m.caida_maxima_pct, 1) + " %" : "—"}</td>
-      <td class="n">${fmt(m.comisiones)}</td>
-      <td><span class="pill ${sn[0]}">${sn[1]}</span></td></tr>`;
+function equipo(v) {
+  const ev = D.eventos, ahora = new Date(D.ahora).getTime();
+  const hora1 = (e) => ahora - new Date(e.tiempo).getTime() < 3600e3;
+  const masterEv = ev.filter((e) => e.tipo.startsWith("master_"));
+  const e = v.escaner || {}, top = (e.candidatos || []).filter((c) => c.aprobado)[0];
+  const s = v.supervisor, caida = s.valor_maximo ? (1 - v.total / s.valor_maximo) * 100 : 0;
+  const ult = D.ejecuciones[0];
+  const tam = v.bots.map((b) => `${b.nombre} x${fmt(b.master.tamano)}`).join(" · ");
+  const roles = [
+    ["🧠", "MASTER", "decide y corrige a los bots", "--neon", `${masterEv.filter(hora1).length} acciones/h`, masterEv[0] ? `"${masterEv[0].bot ? masterEv[0].bot + ": " : ""}${masterEv[0].mensaje}"` : '"Todos en orden, sigo mirando."'],
+    ["📡", "ESCÁNER", "revisa todos los mercados", "--s1", e.escaneados ? `${e.escaneados} vistos` : "en espera", top ? `top: ${moneda(top.par)} ${signo(top.cambio_pct, 1)} % · general ${top.puntajes.general}` : "—"],
+    ["✅", "VERIFICADOR", "solo pasan los que cumplen", "--s3", e.escaneados ? `${e.aprobados}/${e.escaneados} pasan` : "—", e.filtros ? `vol ≥ ${abrev(e.filtros.volumen_min_usdt)} · rango ≥ ${e.filtros.rango_min_pct} % · spread ≤ ${e.filtros.spread_max_pct} %` : "—"],
+    ["🛡️", "RIESGO", "límites duros (Supervisor)", s.estado === "activo" ? "--s3" : "--s2", `caída ${fmt(caida, 1)} / ${s.limites.caida_maxima_pct} %`, s.estado === "activo" ? '"Dentro de los límites."' : `"${s.estado}: ${s.motivo}"`],
+    ["⚡", "EJECUCIÓN", "manda las órdenes a Binance", "--s4", `${D.ejecuciones.filter(hora1).length} órdenes/h`, ult ? `${ult.lado} ${fmt(ult.monto_usdt)} USDT de ${moneda(ult.par)} · ${ult.bot}` : "sin órdenes todavía"],
+    ["📏", "TAMAÑO", "cuánto arriesga cada bot", "--s7", `x${fmt(v.bots.reduce((a, b) => a + b.master.tamano, 0) / v.bots.length)} promedio`, tam],
+  ];
+  $("equipo").innerHTML = roles.map(([ic, t, sub, col, m, q]) => `<div class="rol" style="border-top:2px solid var(${col})">
+    <div class="t"><span class="ic" style="background:color-mix(in srgb, var(${col}) 25%, transparent)">${ic}</span>${t}</div>
+    <div class="sub">${esc(sub)}</div><div class="m num">${esc(m)}</div><div class="q" title="${esc(q)}">${esc(q)}</div></div>`).join("");
+}
+
+function sparkline(vals) {
+  if (!vals || vals.length < 2) return `<svg viewBox="0 0 300 42" preserveAspectRatio="none"><line x1="0" y1="21" x2="300" y2="21" stroke="var(--border)" stroke-dasharray="4 4"/></svg>`;
+  const min = Math.min(...vals), max = Math.max(...vals), r = max - min || 1;
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * 300},${38 - ((v - min) / r) * 34}`).join(" ");
+  const col = vals[vals.length - 1] >= vals[0] ? "var(--good)" : "var(--critical)";
+  return `<svg viewBox="0 0 300 42" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
+function agentes(v) {
+  const filas = v.bots.map((b) => ({ b, m: D.metricas[b.nombre] || {}, r: (b.valor / b.presupuesto - 1) * 100 })).sort((x, y) => y.r - x.r);
+  if (!seleccionado || !v.bots.some((b) => b.nombre === seleccionado)) seleccionado = filas[0]?.b.nombre;
+  $("agentes-sub").textContent = `${v.bots.filter((b) => b.cazador).length} cazadores recorren el mercado · ${v.bots.filter((b) => !b.cazador).length} fijos`;
+  $("agentes").innerHTML = filas.map(({ b, m, r }) => {
+    const [ic, col] = AVATAR[b.estrategia] || ["🤖", "--s1"];
+    const st = MASTER[b.master.estado] || (b.pausado ? ["warning", "⏸️ PAUSADO"] : ESTADO[b.analisis?.senal] || ESTADO.espera);
+    const que = b.cantidad > 0 || !b.cazador ? `$${moneda(b.par)} · ${b.analisis?.texto || ""}`
+      : `buscando por ${b.mercado} · ${b.revisados.map((x) => moneda(x.par)).join(", ") || "esperando escaneo"}`;
+    return `<div class="card agente ${b.nombre === seleccionado ? "sel" : ""}" data-bot="${esc(b.nombre)}">
+      <div class="av" style="background:color-mix(in srgb, var(${col}) 30%, transparent);border:2px solid var(${col})">${ic}</div>
+      <div><div class="nom">${esc(b.nombre)}</div><div class="meta">${esc(b.descripcion)} · ${esc(b.temporalidad)}</div></div>
+      <div class="res"><div class="p ${cls(r)}">${signo(r, 1)}%</div><div class="meta ${cls(r)}">${signo(b.valor - b.presupuesto)} USDT</div></div>
+      <div class="que" style="grid-column:2/3" title="${esc(que)}">${esc(que)}</div>
+      ${sparkline(D.curvas_bots[b.nombre])}
+      <div class="pie"><span class="pill ${st[0]}">${st[1]}</span><span class="meta">${m.ventas || 0} cierres · acierto ${pct(m.tasa_acierto)} · x${fmt(b.master.tamano)}</span>
+        <span class="meta" style="margin-left:auto">$${fmt(b.valor, 0)}</span></div></div>`;
   }).join("");
 }
 
-function detalle(d) {
-  const b = d.en_vivo.bots.find((x) => x.nombre === seleccionado);
-  if (!b) return;
-  const moneda = b.par.split("/")[0];
-  $("det-titulo").textContent = `${b.nombre} · ${b.par} (${b.temporalidad}) · ${fmt(b.precio)}`;
-  $("det-acciones").innerHTML = b.pausado
-    ? `<button onclick="cmd('reanudar','${esc(b.nombre)}')">▶️ Reanudar bot</button>`
-    : `<button onclick="cmd('pausar','${esc(b.nombre)}')">⏸️ Pausar bot</button>`;
+function sala(v) {
+  const W = 800, cx = 400, cy = 215, bots = v.bots, n = bots.length;
+  const ahora = new Date(D.ahora).getTime();
+  const recientes = {};
+  for (const e of D.eventos) if (e.bot && !recientes[e.bot] && e.tipo !== "info" && ahora - new Date(e.tiempo).getTime() < 15 * 60e3) recientes[e.bot] = e;
+  const activo = (b) => { const e = recientes[b]; return e && e.tipo.startsWith("master_") && ahora - new Date(e.tiempo).getTime() < 120e3; };
+  const pos = bots.map((b, i) => { const a = -Math.PI / 2 + (i + 0.5) * (2 * Math.PI / n); return [cx + Math.cos(a) * 300, cy + Math.sin(a) * 150]; });
+  const ESC = [70, 50], SUP = [730, 50];
+  let s = "";
+  bots.forEach((b, i) => {
+    const [x, y] = pos[i];
+    s += `<line class="linea ${activo(b.nombre) ? "activa" : ""}" x1="${cx}" y1="${cy}" x2="${x}" y2="${y}"/>`;
+    if (b.cazador && b.cantidad <= 0) s += `<line class="linea caza" x1="${ESC[0]}" y1="${ESC[1]}" x2="${x}" y2="${y}"/>`;
+  });
+  s += `<line class="linea" x1="${cx}" y1="${cy}" x2="${SUP[0]}" y2="${SUP[1]}"/>`;
+  const nodo = (x, y, r, col, ic, nom, sub, pulso) => `<g class="nodo ${pulso ? "pulso" : ""}"><circle cx="${x}" cy="${y}" r="${r}" fill="color-mix(in srgb, var(${col}) 35%, #000)"/>
+    <text x="${x}" y="${y + r * 0.35}" text-anchor="middle" font-size="${r * 0.95}">${ic}</text>
+    <text x="${x}" y="${y + r + 15}" text-anchor="middle" font-size="12.5" font-weight="700">${esc(nom)}</text>
+    <text x="${x}" y="${y + r + 29}" text-anchor="middle" font-size="11" style="fill:var(--muted)">${esc(sub)}</text></g>`;
+  const e = v.escaner || {};
+  s += nodo(ESC[0], ESC[1], 22, "--s1", "📡", "Escáner", e.escaneados ? `${e.escaneados} mercados` : "en espera", false);
+  s += nodo(SUP[0], SUP[1], 22, v.supervisor.estado === "activo" ? "--s3" : "--s2", "🛡️", "Riesgo", v.supervisor.estado, v.supervisor.estado !== "activo");
+  const algunoActivo = bots.some((b) => activo(b.nombre));
+  s += nodo(cx, cy, 36, "--neon", "🧠", "MASTER", algunoActivo ? "corrigiendo…" : "vigilando", algunoActivo);
+  bots.forEach((b, i) => {
+    const [x, y] = pos[i], [ic, col] = AVATAR[b.estrategia] || ["🤖", "--s1"];
+    const r = (b.valor / b.presupuesto - 1) * 100;
+    s += nodo(x, y, 25, col, ic, b.nombre, `${b.cantidad > 0 ? "$" + moneda(b.par) : b.cazador ? "cazando" : moneda(b.par)} · ${signo(r, 1)}%`, activo(b.nombre));
+    const ev = recientes[b.nombre];
+    if (ev) {
+      const t = ev.mensaje.length > 40 ? ev.mensaje.slice(0, 39) + "…" : ev.mensaje;
+      const w = t.length * 6.4 + 14, bx = Math.max(4, Math.min(W - w - 4, x - w / 2)), by = y < cy ? y - 60 : y + 54;
+      s += `<g class="bur"><rect x="${bx}" y="${by}" width="${w}" height="20" rx="6"/><text x="${bx + 7}" y="${by + 14}">${esc(t)}</text></g>`;
+    }
+  });
+  $("sala").innerHTML = s;
+}
+
+function detalle(v) {
+  const b = v.bots.find((x) => x.nombre === seleccionado); if (!b) return;
+  $("det-titulo").textContent = `${(AVATAR[b.estrategia] || ["🤖"])[0]} ${b.nombre} · ${b.par} (${b.temporalidad}) · ${fmtP(b.precio)}`;
+  $("det-acciones").innerHTML = b.pausado ? `<button onclick="cmd('reanudar','${esc(b.nombre)}')">▶️ Reanudar</button>` : `<button onclick="cmd('pausar','${esc(b.nombre)}')">⏸️ Pausar</button>`;
   $("det-analisis").textContent = b.analisis?.texto || "—";
-  $("det-ind").innerHTML = Object.entries(b.analisis?.indicadores || {}).map(([k, v]) => `<span class="chip">${esc(k.replaceAll("_", " "))}: ${fmt(v, Number.isInteger(v) ? 0 : 2)}</span>`).join("");
-
+  $("det-ind").innerHTML = Object.entries(b.analisis?.indicadores || {}).map(([k, x]) => `<span class="chip">${esc(k.replaceAll("_", " "))}: ${Number.isInteger(x) ? x : fmtP(x)}</span>`).join("")
+    + (b.cantidad > 0 ? [] : (b.revisados || [])).map((r) => `<span class="chip">${moneda(r.par)} · puntaje ${r.puntaje}</span>`).join("");
   const ms = b.master;
-  $("det-master").innerHTML = `
-    <dt>Estado</dt><dd><span class="pill ${MASTER[ms.estado][0]}">${MASTER[ms.estado][1]}</span></dd>
-    ${ms.estado !== "activo" ? `<dt>Motivo</dt><dd>${esc(ms.motivo)} · hasta ${hora(ms.hasta)}</dd>` : ""}
-    <dt>Tamaño de sus órdenes</dt><dd>x${fmt(ms.tamano)}</dd>
-    <dt>Espera entre compras</dt><dd>${ms.espera_min ? ms.espera_min + " min" : "sin límite"}</dd>
-    <dt>Pérdidas seguidas</dt><dd>${ms.racha}</dd>
-    <dt>Valor / efectivo</dt><dd>${fmt(b.valor)} / ${fmt(b.efectivo)}</dd>
-    <dt>Posición</dt><dd>${b.cantidad > 0 ? fmt(b.cantidad, 6) + " " + moneda + " a " + fmt(b.precio_promedio) : "—"}</dd>
-    <dt>Evaluación</dt><dd style="text-align:left">${esc(ms.nota)}</dd>`;
-  const propios = d.eventos.filter((e) => e.bot === b.nombre).slice(0, 25);
-  $("det-feed").innerHTML = propios.length ? propios.map(itemFeed).join("") : '<li class="empty">Sin feedback todavía.</li>';
-
-  const precio = b.grafica.map(([x, y]) => ({ x, y }));
-  const desde = precio.length ? precio[0].x : 0;
-  const ops = d.ejecuciones.filter((e) => e.bot === b.nombre && new Date(e.tiempo).getTime() >= desde);
-  const compras = ops.filter((e) => e.lado === "compra").map((e) => ({ x: new Date(e.tiempo).getTime(), y: e.precio, m: e.motivo }));
-  const ventas = ops.filter((e) => e.lado === "venta").map((e) => ({ x: new Date(e.tiempo).getTime(), y: e.precio, m: e.motivo, g: e.ganancia_usdt }));
+  $("det-master").textContent = `🧠 Master: ${ms.estado}${ms.estado !== "activo" ? " (" + ms.motivo + ")" : ""} · tamaño x${fmt(ms.tamano)} · ${ms.espera_min ? "espera " + ms.espera_min + " min entre compras · " : ""}${ms.nota}`;
+  if (typeof Chart === "undefined") return;
+  const precio = b.grafica.map(([x, y]) => ({ x, y })), desde = precio.length ? precio[0].x : 0;
+  const ops = D.ejecuciones.filter((e) => e.bot === b.nombre && e.par === b.par && new Date(e.tiempo).getTime() >= desde);
+  const mk = (lado) => ops.filter((e) => e.lado === lado).map((e) => ({ x: new Date(e.tiempo).getTime(), y: e.precio, m: e.motivo, g: e.ganancia_usdt }));
   const sup = css("--surface");
   const ds = [
     { label: "Precio", data: precio, borderColor: css("--s1"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0, order: 3 },
-    { label: "Compra", type: "scatter", data: compras, pointStyle: "triangle", pointRadius: 8, pointHoverRadius: 10,
-      backgroundColor: css("--s3"), borderColor: sup, borderWidth: 2, order: 1 },
-    { label: "Venta", type: "scatter", data: ventas, pointStyle: "triangle", rotation: 180, pointRadius: 8, pointHoverRadius: 10,
-      backgroundColor: css("--s2"), borderColor: sup, borderWidth: 2, order: 2 },
+    { label: "Compra", type: "scatter", data: mk("compra"), pointStyle: "triangle", pointRadius: 8, pointHoverRadius: 10, backgroundColor: css("--s3"), borderColor: sup, borderWidth: 2, order: 1 },
+    { label: "Venta", type: "scatter", data: mk("venta"), pointStyle: "triangle", rotation: 180, pointRadius: 8, pointHoverRadius: 10, backgroundColor: css("--s2"), borderColor: sup, borderWidth: 2, order: 2 },
   ];
-  if (typeof Chart === "undefined") return;
   if (!gPrecio) {
-    gPrecio = new Chart($("g-precio"), {
-      type: "line", data: { datasets: ds },
-      options: {
-        maintainAspectRatio: false, animation: false, parsing: false,
-        interaction: { mode: "nearest", intersect: false },
-        plugins: {
-          legend: { position: "top", align: "end", labels: { color: css("--text-2"), usePointStyle: true, boxWidth: 8 } },
-          tooltip: { callbacks: {
-            title: (it) => hora(it[0].parsed.x),
-            label: (it) => {
-              const p = it.raw;
-              if (it.dataset.label === "Precio") return "Precio " + fmt(p.y);
-              return `${it.dataset.label} a ${fmt(p.y)}${p.g != null ? " · " + signo(p.g) + " USDT" : ""} · ${p.m}`;
-            } } },
-        },
-        scales: opcionesEjes((v) => new Date(v).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })),
-      },
-    });
-  } else { gPrecio.data.datasets.forEach((x, i) => (x.data = ds[i].data)); }
-  if (precio.length) { gPrecio.options.scales.x.min = precio[0].x; gPrecio.options.scales.x.max = precio[precio.length - 1].x; }
+    gPrecio = new Chart($("g-precio"), { type: "line", data: { datasets: ds }, options: {
+      maintainAspectRatio: false, animation: false, parsing: false, interaction: { mode: "nearest", intersect: false },
+      plugins: { legend: { position: "top", align: "end", labels: { color: css("--text-2"), usePointStyle: true, boxWidth: 8 } },
+        tooltip: { callbacks: { title: (it) => hora(it[0].parsed.x), label: (it) => it.dataset.label === "Precio" ? "Precio " + fmtP(it.raw.y)
+          : `${it.dataset.label} a ${fmtP(it.raw.y)}${it.raw.g != null ? " · " + signo(it.raw.g) + " USDT" : ""} · ${it.raw.m}` } } },
+      scales: ejes((x) => new Date(x).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })) } });
+  } else gPrecio.data.datasets.forEach((x, i) => (x.data = ds[i].data));
+  if (precio.length) {
+    const ys = precio.map((p) => p.y), pad = (Math.max(...ys) - Math.min(...ys)) * 0.1 || Math.abs(ys[0]) * 0.001;
+    Object.assign(gPrecio.options.scales.x, { min: precio[0].x, max: precio[precio.length - 1].x });
+    Object.assign(gPrecio.options.scales.y, { min: Math.min(...ys) - pad, max: Math.max(...ys) + pad });
+  }
   gPrecio.update();
 }
 
-function graficaTotal(valores) {
-  const vacia = valores.length < 2 || typeof Chart === "undefined";
-  $("g-total").style.display = vacia ? "none" : "block";
-  $("g-total-vacia").style.display = vacia ? "block" : "none";
+function mercados(v) {
+  const e = v.escaner || {}, c = e.candidatos || [];
+  $("merc-vacio").style.display = c.length ? "none" : "block";
+  $("merc-sub").textContent = e.ultimo ? `${e.escaneados} vistos · ${e.aprobados} aprobados · ${hora(e.ultimo)}` : "";
+  const quien = {};
+  for (const b of v.bots) {
+    const ic = (AVATAR[b.estrategia] || ["🤖"])[0];
+    if (b.cantidad > 0) (quien[b.par] ||= []).push([`<b title="${esc(b.nombre)} está dentro">${ic}●</b>`, b.nombre + " (dentro)"]);
+    else for (const r of b.revisados || []) (quien[r.par] ||= []).push([`<span title="${esc(b.nombre)} lo revisa">${ic}</span>`, b.nombre]);
+  }
+  const barra = (x, col) => `<i style="height:${Math.max(2, x * 0.18)}px;background:var(${col})"></i>`;
+  $("merc").innerHTML = c.map((m) => `<tr style="${m.aprobado ? "" : "opacity:.5"}">
+    <td><b>${esc(moneda(m.par))}</b><span class="meta">/USDT</span></td><td class="n">${fmtP(m.precio)}</td>
+    <td class="n ${cls(m.cambio_pct)}">${signo(m.cambio_pct, 1)} %</td><td class="n">${abrev(m.volumen_usdt)}</td><td class="n">${fmt(m.rango_pct, 1)} %</td>
+    <td><div class="barras" title="impulso ${m.puntajes.impulso} · caída ${m.puntajes.caida} · volátil ${m.puntajes.volatil}">${barra(m.puntajes.impulso, "--s7")}${barra(m.puntajes.caida, "--s3")}${barra(m.puntajes.volatil, "--s5")}
+      <span class="meta" style="margin-left:6px">${m.puntajes.impulso} · ${m.puntajes.caida} · ${m.puntajes.volatil}</span></div></td>
+    <td class="fil">${m.filtros.map((f) => `<span title="${f.nombre}: ${f.valor} (umbral ${f.umbral})" class="${f.ok ? "pos" : "neg"}">${f.ok ? "✓" : "✗"}</span>`).join(" ")}</td>
+    <td style="white-space:nowrap" title="${esc((quien[m.par] || []).map((q) => q[1]).join(", "))}">${(quien[m.par] || []).map((q) => q[0]).join(" ")}</td></tr>`).join("");
+}
+
+function umbrales(v) {
+  const e = (v.escaner || {}).filtros || {}, m = v.reglas_master || {}, l = v.limites || {};
+  const fila = (k, val, ok = true) => `<div class="r"><span class="k">${k}</span><span class="num">${val}</span><span class="${ok ? "pos" : "neg"}">${ok ? "✓" : "✗"}</span></div>`;
+  const s = v.supervisor, caida = s.valor_maximo ? (1 - v.total / s.valor_maximo) * 100 : 0;
+  $("umbrales").innerHTML = `
+    <div class="sec">ESCÁNER · para que un mercado pase</div>
+    ${fila("volumen_24h_min", abrev(e.volumen_min_usdt || 0))}${fila("rango_24h_min", (e.rango_min_pct ?? "—") + " %")}${fila("spread_max", (e.spread_max_pct ?? "—") + " %")}
+    <div class="sec">MASTER · cuándo corrige</div>
+    ${fila("perdidas_seguidas → enfriar", m.racha_perdidas + " · " + m.enfriamiento_min + " min")}
+    ${fila("caida_bot → reducir / cuarentena", m.caida_reducir_pct + " % / " + m.caida_cuarentena_pct + " %")}
+    ${fila("perdida_max_por_posicion", m.perdida_max_posicion_pct + " %")}
+    ${fila("tamaño min / max", "x" + m.tamano_min + " / x" + m.tamano_max)}
+    ${fila("movimiento_brusco → bloqueo", m.movimiento_brusco_pct + " % en " + m.ventana_brusca_min + " min")}
+    ${fila("retiro si factor <", m.retirar_factor + " tras " + m.retirar_min_ventas + " ventas")}
+    <div class="sec">SUPERVISOR · freno de todo el sistema</div>
+    ${fila("perdida_diaria_max", l.perdida_diaria_max_pct + " %")}
+    ${fila("caida_maxima (ahora " + fmt(caida, 1) + " %)", l.caida_maxima_pct + " %", caida < l.caida_maxima_pct)}
+    ${fila("reanudar_auto", l.reanudar_auto_horas != null ? l.reanudar_auto_horas + " h" : "manual")}
+    ${fila("orden min / max", l.orden_minima_usdt + " / " + l.orden_maxima_usdt + " USDT")}`;
+}
+
+function cerradas(v) {
+  const c = D.cerradas, est = Object.fromEntries(v.bots.map((b) => [b.nombre, b.estrategia]));
+  $("n-cerradas").textContent = D.global.ventas;
+  const gan = c.filter((x) => x.ganancia_usdt > 0).length;
+  $("cerr-sub").textContent = c.length ? `${gan} de ${c.length} recientes en verde` : "";
+  $("cerradas").innerHTML = c.length ? c.map((x) => {
+    const [ic, col] = AVATAR[est[x.bot]] || ["🤖", "--s1"];
+    return `<li><span class="ic" style="background:color-mix(in srgb, var(${col}) 30%, transparent)">${ic}</span>
+      <div class="tx"><b>$${esc(moneda(x.par))}</b> · ${esc(x.bot)}<div class="t">${x.pct != null ? signo(x.pct, 1) + " % · " : ""}${x.segundos != null ? "duró " + hace(x.segundos) + " · " : ""}${esc(x.motivo)}</div></div>
+      <span class="v ${cls(x.ganancia_usdt)}">${signo(x.ganancia_usdt)}</span></li>`;
+  }).join("") : '<li class="empty">Aún no hay operaciones cerradas.</li>';
+}
+
+function feed() {
+  const acciones = new Set(["master_accion", "master_alerta", "detencion", "pausa", "reanudacion", "error"]);
+  const l = filtroFeed === "todo" ? D.eventos : D.eventos.filter((e) => acciones.has(e.tipo));
+  $("feed").innerHTML = l.length ? l.slice(0, 80).map((e) => `<li><span class="ic" style="background:var(--surface-2)">${ICONOS[e.tipo] || "•"}</span>
+    <div class="tx"><div class="${e.tipo === "master_alerta" || e.tipo === "error" || e.tipo === "detencion" ? "neg" : ""}">${e.bot ? "<b>" + esc(e.bot) + "</b>: " : ""}${esc(e.mensaje)}</div>
+    <div class="t">${hora(e.tiempo)}</div></div></li>`).join("") : '<li class="empty">Sin eventos todavía.</li>';
+}
+
+function balance() {
+  const vacia = D.valores.length < 2 || typeof Chart === "undefined";
+  $("g-total").style.display = vacia ? "none" : "block"; $("g-total-vacia").style.display = vacia ? "block" : "none";
   if (vacia) return;
-  const datos = valores.map((p) => ({ x: new Date(p.tiempo).getTime(), y: p.total }));
+  const datos = D.valores.map((p) => ({ x: new Date(p.tiempo).getTime(), y: p.total }));
   if (!gTotal) {
-    gTotal = new Chart($("g-total"), {
-      type: "line",
-      data: { datasets: [{ data: datos, borderColor: css("--s1"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 5,
-                           pointHoverBorderWidth: 2, pointHoverBorderColor: css("--surface"), pointHoverBackgroundColor: css("--s1"), tension: 0 }] },
-      options: {
-        maintainAspectRatio: false, animation: false, parsing: false, interaction: { mode: "index", intersect: false },
-        plugins: { legend: { display: false }, tooltip: { displayColors: false, callbacks: { title: (it) => hora(it[0].parsed.x), label: (it) => fmt(it.parsed.y) + " USDT" } } },
-        scales: opcionesEjes((v) => new Date(v).toLocaleString("es-MX", horas <= 24 ? { hour: "2-digit", minute: "2-digit" } : { day: "2-digit", month: "short" })),
-      },
-    });
-  } else { gTotal.data.datasets[0].data = datos; }
-  gTotal.options.scales.x.min = datos[0].x; gTotal.options.scales.x.max = datos[datos.length - 1].x;
+    gTotal = new Chart($("g-total"), { type: "line", data: { datasets: [{ data: datos, borderColor: css("--good"), borderWidth: 2, pointRadius: 0,
+      pointHoverRadius: 5, pointHoverBorderWidth: 2, pointHoverBorderColor: css("--surface"), pointHoverBackgroundColor: css("--good"), tension: 0 }] },
+      options: { maintainAspectRatio: false, animation: false, parsing: false, interaction: { mode: "index", intersect: false },
+        plugins: { legend: { display: false }, tooltip: { displayColors: false, callbacks: { title: (it) => hora(it[0].parsed.x), label: (it) => "$" + fmt(it.parsed.y) } } },
+        scales: ejes((x) => new Date(x).toLocaleString("es-MX", horas <= 24 ? { hour: "2-digit", minute: "2-digit" } : { day: "2-digit", month: "short" })) } });
+  } else gTotal.data.datasets[0].data = datos;
+  const ys = datos.map((d) => d.y), pad = (Math.max(...ys) - Math.min(...ys)) * 0.15 || 1;
+  Object.assign(gTotal.options.scales.x, { min: datos[0].x, max: datos[datos.length - 1].x });
+  Object.assign(gTotal.options.scales.y, { min: Math.min(...ys) - pad, max: Math.max(...ys) + pad });
   gTotal.update();
 }
 
-function itemFeed(e) {
-  const clase = e.tipo === "master_alerta" || e.tipo === "detencion" || e.tipo === "error" ? "neg" : "";
-  return `<li><span class="ic">${ICONOS[e.tipo] || "•"}</span><div><div class="${clase}">${e.bot ? "<b>" + esc(e.bot) + "</b>: " : ""}${esc(e.mensaje)}</div>
-    <div class="t">${hora(e.tiempo)}</div></div></li>`;
-}
-
-function feed(eventos) {
-  const acciones = new Set(["master_accion", "master_alerta", "detencion", "pausa", "reanudacion", "error"]);
-  const lista = filtroFeed === "todo" ? eventos : eventos.filter((e) => acciones.has(e.tipo));
-  $("feed").innerHTML = lista.length ? lista.slice(0, 80).map(itemFeed).join("") : '<li class="empty">Sin eventos todavía.</li>';
-}
-
-function operaciones(ops) {
-  $("ops-vacio").style.display = ops.length ? "none" : "block";
-  $("ops").innerHTML = ops.slice(0, 80).map((e) => `<tr>
-    <td style="white-space:nowrap">${hora(e.tiempo)}</td><td>${esc(e.bot)}</td>
+function operaciones() {
+  const o = D.ejecuciones;
+  $("ops-vacio").style.display = o.length ? "none" : "block";
+  $("ops").innerHTML = o.slice(0, 80).map((e) => `<tr><td style="white-space:nowrap">${hora(e.tiempo)}</td><td>${esc(e.bot)}</td><td><b>${esc(moneda(e.par))}</b></td>
     <td><span class="tag ${e.lado === "compra" ? "good" : "warning"}">${e.lado === "compra" ? "▲ compra" : "▼ venta"}</span></td>
-    <td class="n">${fmt(e.precio)}</td><td class="n">${fmt(e.monto_usdt)}</td>
-    <td class="n ${cls(e.ganancia_usdt)}">${e.ganancia_usdt == null ? "" : signo(e.ganancia_usdt)}</td>
+    <td class="n">${fmtP(e.precio)}</td><td class="n">${fmt(e.monto_usdt)}</td><td class="n ${cls(e.ganancia_usdt)}">${e.ganancia_usdt == null ? "" : signo(e.ganancia_usdt)}</td>
     <td>${esc(e.motivo)}</td></tr>`).join("");
 }
 
 function pintar() {
-  const d = ultimo;
-  if (!d || !d.en_vivo) return;
-  cabecera(d.en_vivo, d.ahora); kpis(d); tablaBots(d); detalle(d);
-  graficaTotal(d.valores); feed(d.eventos); operaciones(d.ejecuciones);
+  if (!D || !D.en_vivo) return;
+  const v = D.en_vivo;
+  for (const f of [cabecera, billetera, equipo, agentes, sala, detalle, mercados, umbrales, cerradas]) {
+    try { f(v); } catch (err) { console.error(f.name, err); }
+  }
+  for (const f of [feed, balance, operaciones]) { try { f(); } catch (err) { console.error(f.name, err); } }
 }
 
 async function cargar() {
   try {
-    ultimo = await (await fetch("/api/estado?horas=" + horas)).json();
-    if (!ultimo.en_vivo) { $("latido").innerHTML = '<span class="vivo-dot off"></span> Esperando al motor…'; return; }
+    D = await (await fetch("/api/estado?horas=" + horas)).json();
+    if (!D.en_vivo) { $("latido").innerHTML = '<span class="vivo-dot off"></span> Esperando al motor…'; return; }
     pintar();
-  } catch (e) {
-    $("latido").className = "pill critical"; $("latido").innerHTML = '<span class="vivo-dot off"></span> El panel no responde';
-  }
+  } catch (e) { $("latido").className = "pill critical"; $("latido").innerHTML = '<span class="vivo-dot off"></span> El panel no responde'; }
 }
 
-$("bots").addEventListener("click", (ev) => { const tr = ev.target.closest("tr[data-bot]"); if (tr) { seleccionado = tr.dataset.bot; pintar(); } });
-$("rangos").addEventListener("click", (ev) => {
-  const b = ev.target.closest("button"); if (!b) return;
-  horas = +b.dataset.h; document.querySelectorAll("#rangos button").forEach((x) => x.classList.toggle("on", x === b)); cargar();
-});
-$("filtro-feed").addEventListener("click", (ev) => {
-  const b = ev.target.closest("button"); if (!b) return;
-  filtroFeed = b.dataset.f; document.querySelectorAll("#filtro-feed button").forEach((x) => x.classList.toggle("on", x === b)); pintar();
-});
+$("agentes").addEventListener("click", (ev) => { const c = ev.target.closest("[data-bot]"); if (c) { seleccionado = c.dataset.bot; pintar(); } });
+$("rangos").addEventListener("click", (ev) => { const b = ev.target.closest("button"); if (!b) return; horas = +b.dataset.h;
+  document.querySelectorAll("#rangos button").forEach((x) => x.classList.toggle("on", x === b)); cargar(); });
+$("filtro-feed").addEventListener("click", (ev) => { const b = ev.target.closest("button"); if (!b) return; filtroFeed = b.dataset.f;
+  document.querySelectorAll("#filtro-feed button").forEach((x) => x.classList.toggle("on", x === b)); feed(); });
 cargar();
 setInterval(cargar, 3000);
 </script>

@@ -22,7 +22,8 @@ Edgar también debe poder ver en un panel qué está haciendo cada bot.
 6. Cualquier cambio a límites de riesgo se anota en `docs/DECISIONES.md`.
 
 ## Estado actual
-- Fase: **2, en vivo (Testnet) v0.3**: 6 bots rápidos en paralelo + **Master** + Supervisor + panel en tiempo real.
+- Fase: **2, en vivo (Testnet) v0.4**: **Escáner** de todos los mercados + 4 **cazadores** (par `auto`) + 2 fijos + Master + Supervisor + panel "Sala de bots".
+- Edgar mandó como referencia videos de TikTok de "Grokbot" (memecoins en Solana, saldo marcado como SIM). Se tomó la idea visual y la de "ver todos los mercados"; se le advirtió que esas promociones suelen ser estafas.
 - **Telegram eliminado** por decisión de Edgar: todo se ve en el panel web.
 - **Autonomía total** por decisión de Edgar: nada pide confirmación; el Supervisor se reanuda solo tras 2 h.
   Única excepción: el modo REAL exige `--confirmo-dinero-real` una vez al arrancar.
@@ -52,7 +53,7 @@ Edgar también debe poder ver en un panel qué está haciendo cada bot.
 - `docs/PREGUNTAS.md`: preguntas abiertas para Edgar.
 - `docs/RESULTADOS_BACKTEST.md`: qué aprendimos de los backtests.
 - `docs/GUIA_INSTALACION.md`: cómo instalar y correr en la PC de Edgar.
-- `docs/ESTRUCTURA.md`: cómo funcionan los bots, el Master y el Supervisor.
+- `docs/ESTRUCTURA.md`: cómo funcionan el Escáner, los agentes, el Master y el Supervisor.
 - `tradingbots/`: código (supervisor.py, estrategias/, backtest.py, simulador.py, datos.py).
 
 ## Al terminar cada sesión, Claude debe

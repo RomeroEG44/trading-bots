@@ -139,7 +139,7 @@ def test_panel_api(entorno):
     reloj, db, broker, m = entorno
     m.paso()
     cli = TestClient(crear_app(db))
-    assert "Centro de Control" in cli.get("/").text
+    assert "SALA DE BOTS" in cli.get("/").text
     assert cli.get("/static/chart.umd.min.js").status_code == 200
     d = cli.get("/api/estado").json()
     assert d["en_vivo"]["modo"] == "papel" and len(d["ejecuciones"]) == 1

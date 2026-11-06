@@ -20,3 +20,7 @@ Formato: fecha · decisión · por qué · quién decidió.
 - 2026-11-06 · **Autonomía total**: nada pide confirmación; el Supervisor se reanuda solo 2 h después de una detención automática · Pedido de Edgar · Edgar
 - 2026-11-06 · El modo REAL sigue exigiendo `--confirmo-dinero-real` una sola vez al arrancar (nunca por operación) · Evitar arrancar con dinero real por error · Claude
 - 2026-11-06 · En Testnet, las velas y los precios vienen del propio Testnet (antes, de los datos públicos) · Que las señales coincidan con los precios a los que se opera · Claude
+- 2026-11-06 · **Escáner** de todos los pares USDT y bots **cazadores** que eligen su mercado (par `auto`) · Pedido de Edgar ("que los bots vean todos los mercados") · Edgar
+- 2026-11-06 · Panel estilo "Sala de bots" (oscuro, agentes, sala animada, mercados, umbrales, metas) · Referencia visual de Edgar (videos de Grokbot) · Edgar
+- 2026-11-06 · Se excluyen monedas estables, oro y acciones tokenizadas (AAPLB, NVDAB...) · No son cripto o no se mueven · Claude
+- 2026-11-06 · No se copian los bots de memecoins de Solana de los videos · Riesgo extremo, fuera de Binance, y esas promociones suelen ser estafas · Claude

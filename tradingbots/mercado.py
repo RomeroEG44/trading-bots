@@ -50,6 +50,10 @@ class MercadoPublico:
         return {por_simbolo[x["symbol"]]: float(x["price"]) for x in r.json()}
 
 
+    def mercados(self) -> set[str] | None:
+        return None  # en papel se puede "operar" cualquier par
+
+
 class BrokerPapel(MercadoPublico):
     """Simula las órdenes con precios reales. Ideal para probar en cualquier computadora."""
 
@@ -79,6 +83,10 @@ class BrokerBinance(MercadoPublico):
 
     def precio(self, par: str) -> float:
         return float(self.ex.fetch_ticker(par)["last"])
+
+    def mercados(self) -> set[str]:
+        return {s for s, m in self.ex.markets.items()
+                if m.get("spot") and m.get("active", True) and m.get("quote") == "USDT"}
 
     def precios(self, pares: list[str]) -> dict[str, float]:
         t = self.ex.fetch_tickers(pares)

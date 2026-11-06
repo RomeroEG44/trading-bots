@@ -3,8 +3,9 @@ from .rejilla import Rejilla
 from .reversion import Reversion
 from .ruptura import Ruptura
 from .tendencia import Tendencia
+from .volumen import Volumen
 
-ESTRATEGIAS = {"dca": DCA, "tendencia": Tendencia, "reversion": Reversion, "ruptura": Ruptura, "rejilla": Rejilla}
+ESTRATEGIAS = {"dca": DCA, "tendencia": Tendencia, "reversion": Reversion, "ruptura": Ruptura, "rejilla": Rejilla, "volumen": Volumen}
 
 
 def crear_estrategia(tipo: str, nombre: str, par: str, parametros: dict | None = None):

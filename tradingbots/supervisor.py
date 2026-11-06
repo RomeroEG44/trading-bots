@@ -61,9 +61,6 @@ class Supervisor:
         self._reanudar_si_toca(ahora)
         lim = self.limites
 
-        if intencion.par not in lim.pares_permitidos:
-            return Decision(False, f"par {intencion.par} no está en la lista permitida")
-
         if intencion.lado == "venta":
             cantidad = min(intencion.cantidad or 0.0, cartera.cantidad)
             if cantidad * precio < lim.orden_minima_usdt:
@@ -71,6 +68,8 @@ class Supervisor:
             return Decision(True, "venta aprobada", replace(intencion, cantidad=cantidad))
 
         # compras
+        if intencion.par not in lim.pares_permitidos:
+            return Decision(False, f"par {intencion.par} no está en la lista permitida")
         if self.estado != "activo":
             return Decision(False, f"compras bloqueadas: supervisor {self.estado} ({self.motivo_estado})")
         if intencion.bot in self.bots_pausados:

@@ -18,7 +18,14 @@ def _de_json(v):
 
 
 def f2(x: float) -> str:
-    return f"{x:,.2f}"
+    """Precio legible: 2 decimales para BTC, más para monedas baratas (PEPE, BONK...)."""
+    a = abs(x)
+    return f"{x:,.2f}" if a >= 100 else f"{x:,.4f}" if a >= 1 else f"{x:.6g}"
+
+
+def rd(x: float) -> float:
+    """Redondeo que no convierte en 0 los precios muy pequeños."""
+    return float(f"{x:.6g}")
 
 
 class Estrategia(ABC):
@@ -167,7 +174,7 @@ class EstrategiaDePosicion(Estrategia):
             elif "trailing_activa" in n:
                 partes.append(f"trailing se activa en {f2(n['trailing_activa'])}")
             return {"senal": "en_posicion", "texto": " · ".join(partes),
-                    "indicadores": {k: round(v, 2) for k, v in n.items()}}
+                    "indicadores": {k: rd(v) for k, v in n.items()}}
         if velas is None or len(velas) < 2:
             return {"senal": "espera", "texto": "Esperando datos…", "indicadores": {}}
         texto, ind = self.analisis_sin_posicion(velas)

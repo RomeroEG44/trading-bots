@@ -89,6 +89,9 @@ class Almacen:
     def valores(self, desde: datetime) -> list[dict]:
         return self._filas("SELECT tiempo, total FROM valores WHERE tiempo >= ? ORDER BY tiempo", (_iso(desde),))
 
+    def ejecuciones_completas(self, limite: int = 2000) -> list[dict]:
+        return list(reversed(self._filas("SELECT * FROM ejecuciones ORDER BY id DESC LIMIT ?", (limite,))))
+
     def curvas_por_bot(self, desde: datetime) -> dict[str, list[float]]:
         res: dict[str, list[float]] = {}
         for f in self._filas("SELECT detalle FROM valores WHERE tiempo >= ? ORDER BY tiempo", (_iso(desde),)):

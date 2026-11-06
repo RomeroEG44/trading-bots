@@ -54,7 +54,7 @@ El reporte queda en la carpeta `reports/`.
 
 ---
 
-# Fase 2: los 6 bots en paralelo en el Testnet
+# Fase 2: los 6 agentes en el Testnet (con el Escáner de todos los mercados)
 
 ## 7. Actualizar el proyecto
 En GitHub Desktop: **Fetch origin** y luego **Pull origin**. Después, en la ventana negra (con `.venv\Scripts\activate`):
@@ -72,14 +72,12 @@ Si antes probaste la versión anterior, borra el archivo `data\bots_testnet.sqli
 No tienes que confirmar nada: los bots, el Master y el Supervisor deciden solos.
 
 ## 9. Qué vas a ver en el panel
-| Sección | Qué muestra |
-|---|---|
-| Arriba | Modo (TESTNET), estado del Supervisor, "En vivo" (si el motor responde) y el botón de emergencia |
-| Tarjetas | Valor total, resultado, ganancia realizada, operaciones y % de acierto global |
-| Bots en paralelo | Los 6 bots ordenados por resultado: estado según el Master, tamaño, aciertos, factor de beneficio, peor caída, comisiones y señal actual |
-| Detalle del bot | Clic en un bot: gráfica de precio con sus compras ▲ y ventas ▼, su análisis en este momento y lo que el Master opina de él |
-| Feedback | Todo lo que el Master y el Supervisor deciden, en vivo |
-| Operaciones | Cada compra y venta de todos los bots con su motivo |
+Está todo explicado en `docs/ESTRUCTURA.md` (sección "El panel"). En resumen: billetera con metas, el equipo
+(Master, Escáner, Riesgo…), una tarjeta por agente, la sala animada, los mercados vigilados con sus filtros,
+los umbrales, las operaciones cerradas y lo que dice el equipo en vivo.
+
+**Testnet:** el Testnet de Binance tiene menos monedas que Binance real, así que el Escáner solo usará las que existan
+ahí. El número aparece arriba en el panel ("📡 N mercados").
 
 ## Cosas importantes
 - **Saldo del Testnet:** los 6 bots usan 400 USDT cada uno (2,400 en total). Si tu cuenta de Testnet tiene menos,

@@ -75,7 +75,7 @@ def ejecutar_backtest(config: Config, inicio: datetime, fin: datetime,
     master = Master(ReglasMaster.desde(config.master), {b.nombre: b.master for b in config.bots if b.master}) if usar_master else None
     feedback: list = []
     bots = []
-    for b in config.bots:
+    for b in [b for b in config.bots if not b.auto]:  # los cazadores (par auto) solo corren en vivo
         estrategia = crear_estrategia(b.estrategia, b.nombre, b.par, b.parametros)
         velas = descargar_velas(b.par, b.temporalidad, inicio, fin)
         if velas.empty:

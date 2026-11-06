@@ -20,7 +20,7 @@ import logging
 import sys
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
@@ -29,7 +29,8 @@ from .almacen import Almacen
 from .config import RAIZ, BotConfig, Config, cargar_config, cargar_secretos
 from .datos import DURACION
 from .estrategias import crear_estrategia
-from .estrategias.base import Estrategia
+from .escaner import Escaner, FiltrosEscaner
+from .estrategias.base import Estrategia, EstrategiaDePosicion
 from .master import Master, ReglasMaster
 from .modelos import Cartera, Intencion
 from .supervisor import Supervisor
@@ -47,6 +48,15 @@ class BotVivo:
     proxima_revision: datetime = field(default_factory=lambda: datetime.min.replace(tzinfo=timezone.utc))
     velas: pd.DataFrame | None = None
     analisis: dict = field(default_factory=dict)
+    revisados: list = field(default_factory=list)  # cazadores: mercados revisados en la última vela
+
+    @property
+    def par(self) -> str:
+        return self.cartera.par
+
+    @property
+    def cazando(self) -> bool:
+        return self.cfg.auto and self.cartera.cantidad <= 0
 
 
 class Motor:
@@ -64,37 +74,47 @@ class Motor:
         self._rechazos_vistos: dict[tuple[str, str], datetime] = {}
         self._errores_vistos: dict[str, datetime] = {}
         self._eventos_sup = len(self.sup.eventos)
+        self.escaner = Escaner(FiltrosEscaner.desde(config.escaner))
+        self._pares_fijos = list(config.riesgo.pares_permitidos)
 
         self.bots: dict[str, BotVivo] = {}
         for b in config.bots:
             estrategia = crear_estrategia(b.estrategia, b.nombre, b.par, b.parametros)
             guardado = self.db.cargar_bot(b.nombre)
+            if b.auto and not isinstance(estrategia, EstrategiaDePosicion):
+                raise ValueError(f"{b.nombre}: par auto solo funciona con tendencia, reversion, ruptura o volumen")
             if guardado:
                 cartera, estado, ultima = guardado
                 estrategia.cargar_estado(estado)
             else:
-                cartera, ultima = Cartera(b.nombre, b.par, b.presupuesto_usdt), None
+                cartera, ultima = Cartera(b.nombre, "BTC/USDT" if b.auto else b.par, b.presupuesto_usdt), None
+            estrategia.par = cartera.par
             self.bots[b.nombre] = BotVivo(b, estrategia, cartera, ultima)
-        self.pares = sorted({b.cfg.par for b in self.bots.values()})
+
+    @property
+    def pares(self) -> list[str]:
+        return sorted({b.par for b in self.bots.values()})
 
     # ================= ciclo principal =================
     def paso(self) -> None:
         ahora = self.reloj()
         self._procesar_comandos(ahora)
+        self._escanear(ahora)
         self.precios.update(self.broker.precios(self.pares))
         for par in self.pares:
             self.master.registrar_precio(par, ahora, self.precios[par])
 
         for bot in self.bots.values():
             try:
-                precio = self.precios[bot.cfg.par]
+                precio = self.precios[bot.par]
                 for i in bot.estrategia.en_precio(precio, bot.cartera):
                     self._intentar(bot, i, precio, ahora)
                 if ahora >= bot.proxima_revision:
                     self._procesar_velas(bot, ahora)
                 for i in self.master.revisar(ahora, bot.cfg.nombre, bot.cartera, precio):
                     self._intentar(bot, i, precio, ahora)
-                bot.analisis = bot.estrategia.analisis(bot.velas, bot.cartera, precio, ahora)
+                bot.analisis = self._analisis_cazador(bot) if bot.cazando else \
+                    bot.estrategia.analisis(bot.velas, bot.cartera, self.precios.get(bot.par, precio), ahora)
             except Exception as e:
                 self._error(ahora, f"{bot.cfg.nombre}: {e}", bot.cfg.nombre)
             self.db.guardar_bot(bot.cartera, bot.estrategia.exportar_estado(), bot.ultima_vela)
@@ -106,7 +126,7 @@ class Motor:
         self.db.poner("master", self.master.exportar())
 
         if self._ultimo_valor_guardado is None or ahora - self._ultimo_valor_guardado >= timedelta(minutes=1):
-            self.db.guardar_valor(ahora, total, {n: round(b.cartera.valor(self.precios[b.cfg.par]), 4)
+            self.db.guardar_valor(ahora, total, {n: round(b.cartera.valor(self.precios[b.par]), 4)
                                                  for n, b in self.bots.items()})
             self._ultimo_valor_guardado = ahora
         self.db.poner("en_vivo", self.foto(ahora))
@@ -123,9 +143,65 @@ class Motor:
             time.sleep(max(1.0, intervalo_s - (time.monotonic() - inicio)))
 
     # ================= velas y órdenes =================
-    def _procesar_velas(self, bot: BotVivo, ahora: datetime) -> None:
+    def _escanear(self, ahora: datetime) -> None:
+        if not any(b.cfg.auto for b in self.bots.values()) or not self.escaner.toca(ahora):
+            return
+        try:
+            if self.escaner.disponibles is None and hasattr(self.broker, "mercados"):
+                self.escaner.disponibles = self.broker.mercados()
+            self.escaner.escanear(ahora)
+        except Exception as e:
+            self.escaner.ultimo = ahora  # reintenta en el siguiente turno, sin saturar
+            self._error(ahora, f"escáner: {e}")
+            return
+        self.sup.limites.pares_permitidos = sorted(set(self._pares_fijos) | set(self.escaner.aprobados))
+
+    def _cazar(self, bot: BotVivo, ahora: datetime) -> None:
+        """Cazador sin posición: revisa los mejores mercados del escáner y entra en el primero que dé señal."""
         dur = timedelta(seconds=DURACION[bot.cfg.temporalidad])
-        velas = self.broker.velas(bot.cfg.par, bot.cfg.temporalidad, max(200, bot.estrategia.velas_minimas + 50))
+        base = datetime.fromtimestamp((ahora.timestamp() // dur.total_seconds()) * dur.total_seconds(), timezone.utc)
+        bot.proxima_revision = base + dur + timedelta(seconds=3)
+        revisados = []
+        for c in self.escaner.mejores(bot.cfg.mercado, bot.cfg.candidatos):
+            velas = self.broker.velas(c.par, bot.cfg.temporalidad, max(200, bot.estrategia.velas_minimas + 50))
+            if len(velas) < bot.estrategia.velas_minimas:
+                continue
+            preparadas = bot.estrategia.preparar(velas)
+            bot.estrategia.par = c.par
+            intenciones = bot.estrategia.en_vela(preparadas, bot.cartera, velas.index[-1].to_pydatetime() + dur)
+            a = bot.estrategia.analisis(preparadas, bot.cartera, float(velas["close"].iloc[-1]), ahora)
+            revisados.append({"par": c.par, "puntaje": round(c.puntajes[bot.cfg.mercado]), "senal": a["senal"],
+                              "texto": a["texto"]})
+            if bot.velas is None or not revisados[:-1]:
+                bot.velas = preparadas
+            compra = next((i for i in intenciones if i.lado == "compra"), None)
+            if compra:
+                bot.cartera.par = c.par
+                bot.velas, bot.ultima_vela = preparadas, velas.index[-1].to_pydatetime()
+                self.precios.setdefault(c.par, float(velas["close"].iloc[-1]))
+                self.db.guardar_evento(ahora, "info", f"elige {c.par} (puntaje {c.puntajes[bot.cfg.mercado]:.0f} "
+                                                      f"de {bot.cfg.mercado}) entre {len(revisados)} revisados", bot.cfg.nombre)
+                self._intentar(bot, compra, self.precios[c.par], ahora)
+                break
+        bot.revisados = revisados
+        bot.estrategia.par = bot.cartera.par
+
+    def _analisis_cazador(self, bot: BotVivo) -> dict:
+        if not self.escaner.candidatos:
+            return {"senal": "buscando", "texto": "Esperando el primer escaneo de mercados…", "indicadores": {}}
+        if not bot.revisados:
+            return {"senal": "buscando", "texto": f"Cazando por {bot.cfg.mercado}: revisará los mejores "
+                                                  f"{bot.cfg.candidatos} mercados al cerrar la vela.", "indicadores": {}}
+        lista = ", ".join(f"{r['par'].split('/')[0]} {r['puntaje']}" for r in bot.revisados)
+        return {"senal": "buscando", "indicadores": {},
+                "texto": f"Cazando por {bot.cfg.mercado} entre {self.escaner.escaneados} mercados · revisó {lista}. "
+                         f"Ninguno da señal todavía: {bot.revisados[0]['texto']}"}
+
+    def _procesar_velas(self, bot: BotVivo, ahora: datetime) -> None:
+        if bot.cazando:
+            return self._cazar(bot, ahora)
+        dur = timedelta(seconds=DURACION[bot.cfg.temporalidad])
+        velas = self.broker.velas(bot.par, bot.cfg.temporalidad, max(200, bot.estrategia.velas_minimas + 50))
         if velas.empty:
             return
         ultima = velas.index[-1].to_pydatetime()
@@ -138,10 +214,10 @@ class Motor:
         if len(velas) < bot.estrategia.velas_minimas:
             return
         if primera_vez:
-            self.db.guardar_evento(ahora, "info", f"empieza a operar {bot.cfg.par} en velas de {bot.cfg.temporalidad}",
+            self.db.guardar_evento(ahora, "info", f"empieza a operar {bot.par} en velas de {bot.cfg.temporalidad}",
                                    bot.cfg.nombre)
         for i in bot.estrategia.en_vela(bot.velas, bot.cartera, ultima + dur):
-            self._intentar(bot, i, self.precios[bot.cfg.par], ahora)
+            self._intentar(bot, i, self.precios[bot.par], ahora)
 
     def _intentar(self, bot: BotVivo, intencion: Intencion, precio: float, ahora: datetime) -> None:
         ajustada, motivo = self.master.ajustar(intencion, ahora)
@@ -201,20 +277,21 @@ class Motor:
             self.db.guardar_evento(ahora, "error", texto, bot)
 
     def valor_total(self) -> float:
-        return sum(b.cartera.valor(self.precios.get(b.cfg.par, 0.0)) for b in self.bots.values())
+        return sum(b.cartera.valor(self.precios.get(b.par, 0.0)) for b in self.bots.values())
 
     def foto(self, ahora: datetime) -> dict:
         """Todo lo que el panel necesita para dibujar el estado en vivo."""
         bots = []
         for n, b in self.bots.items():
-            precio = self.precios.get(b.cfg.par, 0.0)
+            precio = self.precios.get(b.par, 0.0)
             grafica = []
             if b.velas is not None:
                 v = b.velas.tail(PUNTOS_GRAFICA)
-                grafica = [[int(t.timestamp() * 1000), round(float(c), 6)] for t, c in zip(v.index, v["close"])]
+                grafica = [[int(t.timestamp() * 1000), float(f"{c:.6g}")] for t, c in zip(v.index, v["close"])]
             bots.append({
                 "nombre": n, "estrategia": b.cfg.estrategia, "descripcion": b.estrategia.DESCRIPCION,
-                "par": b.cfg.par, "temporalidad": b.cfg.temporalidad, "precio": precio,
+                "par": b.par, "cazador": b.cfg.auto, "mercado": b.cfg.mercado if b.cfg.auto else None,
+                "revisados": b.revisados, "temporalidad": b.cfg.temporalidad, "precio": precio,
                 "presupuesto": b.cartera.presupuesto, "efectivo": b.cartera.efectivo, "cantidad": b.cartera.cantidad,
                 "precio_promedio": b.cartera.precio_promedio, "valor": b.cartera.valor(precio),
                 "pausado": n in self.sup.bots_pausados, "analisis": b.analisis, "master": self.master.resumen(n),
@@ -230,6 +307,9 @@ class Motor:
             "mercado": {p: {"precio": self.precios.get(p), "bloqueo": self.master.bloqueos.get(p, (None, None))[1]}
                         for p in self.pares},
             "total": self.valor_total(), "presupuesto": sum(b["presupuesto"] for b in bots), "bots": bots,
+            "escaner": self.escaner.foto(),
+            "reglas_master": asdict(self.master.reglas_base),
+            "limites": {k: v for k, v in asdict(self.config.riesgo).items() if k != "pares_permitidos"},
         }
 
 

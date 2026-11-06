@@ -2,7 +2,7 @@
 sube un paso por encima de su precio de compra. Gana con el sube y baja del precio."""
 from __future__ import annotations
 
-from .base import Estrategia, f2
+from .base import Estrategia, f2, rd
 
 
 class Rejilla(Estrategia):
@@ -60,4 +60,4 @@ class Rejilla(Estrategia):
         texto = (f"{len(self.lotes)}/{self.p['max_lotes']} lotes abiertos · próxima compra en {f2(compra)} "
                  f"({(compra / precio - 1) * 100:+.2f}%) · próxima venta en {f2(venta)} ({(venta / precio - 1) * 100:+.2f}%)")
         return {"senal": "en_posicion", "texto": texto,
-                "indicadores": {"lotes": len(self.lotes), "proxima_compra": round(compra, 2), "proxima_venta": round(venta, 2)}}
+                "indicadores": {"lotes": len(self.lotes), "proxima_compra": rd(compra), "proxima_venta": rd(venta)}}

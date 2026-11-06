@@ -1,4 +1,4 @@
-# Estructura del sistema (v0.3: bots en paralelo + Master)
+# Estructura del sistema (v0.4: Escáner de todos los mercados + cazadores + Sala de bots)
 
 ## Cómo se toma cada decisión
 ```
@@ -20,17 +20,36 @@
 ```
 Las **ventas nunca se bloquean**: un stop-loss o un cierre del Master siempre pasa.
 
-## Los 6 bots (config/testnet.yaml)
-| Bot | Estrategia | Par | Velas | Idea |
-|---|---|---|---|---|
-| tendencia_btc_1m | Tendencia EMA 9/21 + RSI | BTC/USDT | 1 min | Sigue subidas cortas; stop 0.4 %, objetivo 0.8 % |
-| tendencia_eth_5m | Tendencia EMA 9/21 + RSI | ETH/USDT | 5 min | Igual, más lento; stop 0.8 %, objetivo 1.6 % |
-| reversion_btc_5m | Reversión a la media (Bollinger) | BTC/USDT | 5 min | Compra caídas exageradas y vende al volver al promedio |
-| ruptura_eth_15m | Ruptura de máximos (Donchian) | ETH/USDT | 15 min | Compra cuando rompe el máximo de 20 velas |
-| rejilla_btc | Rejilla (grid) | BTC/USDT | en vivo | Compra cada −0.4 % y vende cada lote a +0.4 % |
-| dca_eth_15m | DCA rápido | ETH/USDT | 15 min | Compra cada 30 min, doble si baja 0.7 %, vende la mitad a +1 % |
+## El Escáner (tradingbots/escaner.py)
+Cada minuto revisa **todos los pares en USDT de Binance** (unos 565 de criptomonedas reales). Descarta las monedas estables
+(USDC, FDUSD…), el oro tokenizado y las **acciones tokenizadas** (AAPLB, NVDAB, SPYB…). En Testnet solo cuenta los pares
+que existen en el Testnet. A cada mercado le aplica 3 filtros y le pone 3 puntajes:
 
-Cada bot tiene su propio presupuesto (400 USDT) dentro de la misma cuenta de Testnet.
+| Filtro (Verificador) | Umbral | Por qué |
+|---|---|---|
+| Volumen 24 h | ≥ 15 millones USDT | Que haya gente comprando y vendiendo |
+| Rango 24 h | ≥ 2 % | Que el precio se mueva lo suficiente para ganarle a las comisiones |
+| Spread | ≤ 0.15 % | Que comprar y vender no cueste de más |
+
+| Puntaje (0-100) | Qué premia |
+|---|---|
+| impulso | Subió en el día y está cerca de su máximo |
+| caída | Bajó en el día y está cerca de su mínimo |
+| volátil | Se mueve mucho y tiene mucho volumen |
+
+## Los 6 agentes (config/testnet.yaml)
+| Agente | Estrategia | Mercado | Velas | Idea |
+|---|---|---|---|---|
+| 🎯 francotirador | Tendencia EMA 9/21 + RSI | **auto**: los más volátiles | 1 min | Entradas rápidas; stop 0.6 %, objetivo 1.2 % |
+| 🚀 impulso | Ruptura de máximos | **auto**: los que más suben | 5 min | Compra cuando rompe el máximo de 20 velas |
+| 🎣 cazacaidas | Reversión (Bollinger + RSI) | **auto**: los que más cayeron | 5 min | Compra caídas exageradas, vende al volver al promedio |
+| 🐋 ballena | Picos de volumen comprador | **auto**: los más volátiles | 5 min | Entra cuando una vela tiene 3 veces el volumen normal y es verde |
+| 🧱 rejilla_btc | Rejilla | BTC/USDT fijo | en vivo | Compra cada −0.4 % y vende cada lote a +0.4 % |
+| 🪙 dca_eth | DCA rápido | ETH/USDT fijo | 15 min | Compra cada 30 min, doble si baja 0.7 % |
+
+Los **cazadores** (par `auto`), cuando no tienen posición, revisan al cerrar cada vela los 4 mejores mercados del Escáner
+según su puntaje y entran en el primero que da señal. Mientras tienen posición se quedan en ese mercado hasta salir.
+Cada agente tiene su propio presupuesto de 400 USDT.
 
 ## El Master (tradingbots/master.py)
 | Situación | Qué hace (solo, sin preguntar) |
@@ -52,25 +71,36 @@ Todas estas reglas se cambian en la sección `master:` de `config/testnet.yaml`,
 - Caída de 10 % desde el máximo → detiene todas las compras y **se reanuda solo a las 2 h**.
 - Botón 🛑 del panel: detención manual. Es la única que espera a que tú reanudes.
 
+## El panel: Sala de bots (http://localhost:8000)
+- **Billetera:** valor total, ganancia, multiplicador desde el inicio y barra de metas (+5 %, +10 %, +25 %).
+- **Equipo:** Master, Escáner, Verificador, Riesgo, Ejecución y Tamaño, cada uno con su dato y su último mensaje.
+- **Agentes:** tarjeta por bot con su mercado actual, qué está haciendo, curva de su valor, % de ganancia y cierres.
+- **La sala:** diagrama animado; las líneas se iluminan cuando el Master corrige a un bot o el Escáner le manda mercados.
+- **Detalle:** gráfica del mercado del bot con sus compras ▲ y ventas ▼, más su análisis en este momento.
+- **Mercados vigilados:** los 30 mejores del Escáner con filtros ✓/✗, puntajes y qué bot los mira o está dentro.
+- **umbrales.py:** todos los umbrales del Escáner, el Master y el Supervisor.
+- **Cerradas, Feedback en vivo, Balance y Operaciones.**
+
 ## Archivos
 ```
 tradingbots/
-  motor.py            ciclo en vivo: bots en paralelo + Master + Supervisor
+  motor.py            ciclo en vivo: agentes en paralelo + Escáner + Master + Supervisor
+  escaner.py          revisa todos los mercados, filtra y califica
   master.py           el bot principal (feedback y correcciones)
   supervisor.py       límites duros de riesgo
-  estrategias/        dca, tendencia, reversion, ruptura, rejilla (+ base con stops)
+  estrategias/        dca, tendencia, reversion, ruptura, rejilla, volumen (+ base con stops)
   mercado.py          Binance Testnet/real (ccxt) y modo papel
   almacen.py          base de datos SQLite
   metricas.py         acierto, factor de beneficio, caída, comisiones
   panel.py + panel.html   panel web en tiempo real
   backtest.py         pruebas con datos históricos (con o sin Master)
 config/
-  testnet.yaml        los 6 bots rápidos + reglas del Master   ← el que se usa ahora
+  testnet.yaml        los 6 agentes + Escáner + reglas del Master   ← el que se usa ahora
   pruebas.yaml        bots lentos para backtests largos
   real.yaml           40 USD reales (Fase 3, aún no)
 ```
 
-## Qué dicen los datos (backtest de los últimos 7 días)
+## Qué dicen los datos (backtest de 7 días de la versión anterior, con bots fijos)
 | | Sin Master | Con Master |
 |---|---:|---:|
 | Resultado total | −8.2 % | **−2.0 %** |
@@ -80,3 +110,6 @@ config/
 **El Master reduce mucho las pérdidas, pero ninguna de las 6 estrategias rápidas ganó en esa semana.**
 Con comisiones de 0.1 % por operación, ganar en velas de 1 a 15 minutos es muy difícil. El Testnet sirve para ver en
 horas qué bot sobrevive y para afinar el Master; no garantiza nada para el dinero real.
+
+Los cazadores todavía no se pueden probar en backtest, porque eso requiere historial de cientos de mercados a la vez.
+Su prueba es el Testnet.

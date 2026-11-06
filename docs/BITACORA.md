@@ -51,3 +51,17 @@
 **Siguiente:**
 - Edgar: actualizar, arrancar en Testnet y dejarlo correr; contar qué ve en el panel.
 - Claude: con datos del Testnet, ajustar parámetros y buscar estrategias que ganen después de comisiones.
+
+## 2026-11-06 · Sesión 4: Escáner, cazadores y Sala de bots
+**Hecho:**
+- Se analizaron los 2 videos de referencia de Edgar.
+- `escaner.py`: revisa unos 565 mercados cada minuto, con filtros (volumen, rango, spread) y puntajes (impulso, caída, volátil).
+- Bots cazadores (`par: auto`): francotirador, impulso, cazacaidas y ballena (estrategia nueva `volumen`).
+- Panel "Sala de bots": billetera con metas, equipo, agentes con curva, sala animada, mercados vigilados,
+  umbrales, cerradas y feedback.
+- Las ventas ya no dependen de la lista de pares permitidos (solo las compras).
+- 40 pruebas pasando. Prueba en vivo en modo papel unos 10 min: 565 mercados escaneados, 0 errores.
+
+**Siguiente:**
+- Edgar: actualizar y correr en Testnet; revisar cuántos mercados quedan disponibles en el Testnet.
+- Claude: ajustar filtros y estrategias de los cazadores con los resultados reales.

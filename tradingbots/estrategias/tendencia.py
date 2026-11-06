@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from ..indicadores import ema, rsi
-from .base import SALIDAS, EstrategiaDePosicion, f2
+from .base import SALIDAS, EstrategiaDePosicion, f2, rd
 
 
 class Tendencia(EstrategiaDePosicion):
@@ -36,5 +36,5 @@ class Tendencia(EstrategiaDePosicion):
         texto = (f"EMA{p['ema_rapida']} {f2(u['ema_rapida'])} {'sobre' if alcista else 'bajo'} "
                  f"EMA{p['ema_lenta']} {f2(u['ema_lenta'])} ({'alcista' if alcista else 'bajista'}) · RSI {u['rsi']:.0f}. "
                  f"Espera: cruce alcista con RSI entre {p['rsi_min']:g} y {p['rsi_max']:g}.")
-        return texto, {"ema_rapida": round(u["ema_rapida"], 2), "ema_lenta": round(u["ema_lenta"], 2),
+        return texto, {"ema_rapida": rd(u["ema_rapida"]), "ema_lenta": rd(u["ema_lenta"]),
                        "rsi": round(u["rsi"], 1)}

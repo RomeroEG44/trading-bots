@@ -1,8 +1,17 @@
-# Configuración para el TESTNET (y modo papel): 6 bots rápidos en paralelo.
+# Configuración para el TESTNET (y modo papel): 4 cazadores que recorren TODOS los mercados + 2 bots fijos.
 # Todo es experimental: el Master mide en vivo qué funciona y frena lo que no.
 # Si tu cuenta Testnet tiene menos USDT que la suma de presupuestos (2,400), baja presupuesto_usdt.
 comision_pct: 0.1
 deslizamiento_pct: 0.05
+
+escaner:                        # el Escáner revisa todos los pares en USDT cada minuto
+  volumen_min_usdt: 15000000    # mínimo 15 millones de USDT negociados en 24 h
+  rango_min_pct: 2.0            # que el precio se mueva al menos 2 % en el día
+  spread_max_pct: 0.15
+  max_candidatos: 30
+  cada_seg: 60
+  excluir_acciones: true        # ignora acciones tokenizadas (AAPLB, NVDAB...): no son cripto
+  excluir: []                   # otras monedas a ignorar, por ejemplo [ZEC, ONE]
 
 riesgo:                         # límites DUROS del Supervisor para todo el sistema
   pares_permitidos: [BTC/USDT, ETH/USDT]
@@ -34,34 +43,44 @@ master:                         # reglas del Master (bot principal)
   retiro_horas: 24
 
 bots:
-  - nombre: tendencia_btc_1m
+  # ---- Cazadores: eligen solos su mercado entre los mejores del Escáner ----
+  - nombre: francotirador
     estrategia: tendencia
-    par: BTC/USDT
+    par: auto
+    mercado: volatil            # busca los mercados que más se mueven
+    candidatos: 4
     temporalidad: 1m
     presupuesto_usdt: 400
-    parametros: {stop_loss_pct: 0.4, take_profit_pct: 0.8, trailing_activacion_pct: 0.4, trailing_pct: 0.25, fraccion_capital: 0.5}
+    parametros: {stop_loss_pct: 0.6, take_profit_pct: 1.2, trailing_activacion_pct: 0.6, trailing_pct: 0.35, fraccion_capital: 0.5}
 
-  - nombre: tendencia_eth_5m
-    estrategia: tendencia
-    par: ETH/USDT
-    temporalidad: 5m
-    presupuesto_usdt: 400
-    parametros: {stop_loss_pct: 0.8, take_profit_pct: 1.6, trailing_activacion_pct: 0.8, trailing_pct: 0.5, fraccion_capital: 0.5}
-
-  - nombre: reversion_btc_5m
-    estrategia: reversion
-    par: BTC/USDT
-    temporalidad: 5m
-    presupuesto_usdt: 400
-    parametros: {periodo: 20, desviaciones: 2.0, rsi_max_entrada: 35, stop_loss_pct: 0.8, fraccion_capital: 0.5}
-
-  - nombre: ruptura_eth_15m
+  - nombre: impulso
     estrategia: ruptura
-    par: ETH/USDT
-    temporalidad: 15m
+    par: auto
+    mercado: impulso            # busca lo que más sube y está cerca de su máximo
+    candidatos: 4
+    temporalidad: 5m
     presupuesto_usdt: 400
-    parametros: {entrada_velas: 20, salida_velas: 10, stop_loss_pct: 1.0, trailing_activacion_pct: 1.0, trailing_pct: 0.6, fraccion_capital: 0.5}
+    parametros: {entrada_velas: 20, salida_velas: 10, stop_loss_pct: 1.2, trailing_activacion_pct: 1.2, trailing_pct: 0.7, fraccion_capital: 0.5}
 
+  - nombre: cazacaidas
+    estrategia: reversion
+    par: auto
+    mercado: caida              # busca lo que más cayó y está cerca de su mínimo
+    candidatos: 4
+    temporalidad: 5m
+    presupuesto_usdt: 400
+    parametros: {periodo: 20, desviaciones: 2.0, rsi_max_entrada: 30, stop_loss_pct: 1.5, fraccion_capital: 0.5}
+
+  - nombre: ballena
+    estrategia: volumen
+    par: auto
+    mercado: volatil
+    candidatos: 4
+    temporalidad: 5m
+    presupuesto_usdt: 400
+    parametros: {multiplo_volumen: 3.0, stop_loss_pct: 1.2, trailing_activacion_pct: 1.0, trailing_pct: 0.6, fraccion_capital: 0.5}
+
+  # ---- Fijos ----
   - nombre: rejilla_btc
     estrategia: rejilla
     par: BTC/USDT
@@ -70,7 +89,7 @@ bots:
     parametros: {paso_pct: 0.4, monto_usdt: 50, max_lotes: 6}
     master: {perdida_max_posicion_pct: 3.5}   # la rejilla aguanta más caída por diseño
 
-  - nombre: dca_eth_15m
+  - nombre: dca_eth
     estrategia: dca
     par: ETH/USDT
     temporalidad: 15m

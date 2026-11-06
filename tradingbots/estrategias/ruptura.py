@@ -2,7 +2,7 @@
 y vende si pierde el mínimo de las últimas M velas."""
 from __future__ import annotations
 
-from .base import SALIDAS, EstrategiaDePosicion, f2
+from .base import SALIDAS, EstrategiaDePosicion, f2, rd
 
 
 class Ruptura(EstrategiaDePosicion):
@@ -33,4 +33,4 @@ class Ruptura(EstrategiaDePosicion):
         falta = (u["techo"] / u["close"] - 1) * 100
         texto = (f"Precio {f2(u['close'])} · techo de {self.p['entrada_velas']} velas {f2(u['techo'])} "
                  f"(falta {falta:+.2f}%). Espera: cierre por encima del techo.")
-        return texto, {"techo": round(u["techo"], 2), "piso": round(u["piso"], 2)}
+        return texto, {"techo": rd(u["techo"]), "piso": rd(u["piso"])}

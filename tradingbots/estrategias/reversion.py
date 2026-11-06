@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..indicadores import rsi
-from .base import SALIDAS, EstrategiaDePosicion, f2
+from .base import SALIDAS, EstrategiaDePosicion, f2, rd
 
 
 class Reversion(EstrategiaDePosicion):
@@ -40,5 +40,5 @@ class Reversion(EstrategiaDePosicion):
         texto = (f"Precio {f2(u['close'])} · banda inferior {f2(u['banda_inferior'])} ({dist:+.2f}%) · "
                  f"promedio {f2(u['media'])} · RSI {u['rsi']:.0f}. "
                  f"Espera: cierre bajo la banda inferior con RSI < {p['rsi_max_entrada']:g}.")
-        return texto, {"banda_inferior": round(u["banda_inferior"], 2), "media": round(u["media"], 2),
-                       "banda_superior": round(u["banda_superior"], 2), "rsi": round(u["rsi"], 1)}
+        return texto, {"banda_inferior": rd(u["banda_inferior"]), "media": rd(u["media"]),
+                       "banda_superior": rd(u["banda_superior"]), "rsi": round(u["rsi"], 1)}
