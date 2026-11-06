@@ -4,10 +4,11 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from ..modelos import Cartera, Ejecucion, Intencion
-from .base import Estrategia
+from .base import Estrategia, f2
 
 
 class DCA(Estrategia):
+    DESCRIPCION = "Compra programada (DCA)"
     PARAMETROS = {
         "monto_usdt": 10.0,  # cuánto comprar cada vez
         "cada_horas": 24,  # cada cuánto comprar
@@ -56,3 +57,20 @@ class DCA(Estrategia):
             self.ultima_compra_precio = e.precio
         else:
             self.ultima_toma_precio = e.precio
+
+    def analisis(self, velas, cartera, precio, ahora):
+        p = self.p
+        partes = []
+        if self.ultima_compra_t:
+            proxima = self.ultima_compra_t + timedelta(hours=p["cada_horas"])
+            minutos = max(0, (proxima - ahora).total_seconds() / 60)
+            partes.append(f"Próxima compra en {minutos:.0f} min" if minutos < 120 else f"Próxima compra en {minutos / 60:.1f} h")
+        else:
+            partes.append("Compra en la siguiente vela")
+        if self.ultima_compra_precio:
+            doble = self.ultima_compra_precio * (1 - p["caida_para_doble_pct"] / 100)
+            partes.append(f"compra x{p['multiplicador_caida']:g} si baja a {f2(doble)}")
+        if cartera.cantidad > 0:
+            objetivo = cartera.precio_promedio * (1 + p["toma_ganancia_pct"] / 100)
+            partes.append(f"promedio {f2(cartera.precio_promedio)}, vende {p['fraccion_venta']:.0%} en {f2(objetivo)}")
+        return {"senal": "en_posicion" if cartera.cantidad > 0 else "espera", "texto": " · ".join(partes), "indicadores": {}}

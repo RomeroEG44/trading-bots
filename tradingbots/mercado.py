@@ -1,12 +1,12 @@
 """Conexión con el mercado.
 
-- Las VELAS para decidir siempre vienen de los datos públicos de Binance (mercado real).
-- Las ÓRDENES van a:
-    * BrokerPapel   -> simulación con precios reales (no necesita claves, funciona en cualquier lugar)
-    * BrokerBinance -> Binance Testnet (dinero de prueba) o Binance real
+- BrokerPapel   -> precios y velas reales (datos públicos de Binance) con órdenes simuladas. Sin claves.
+- BrokerBinance -> Binance Testnet o Binance real: velas, precios y órdenes salen de la MISMA bolsa,
+                   para que las señales coincidan con los precios a los que se opera.
 """
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timezone
 
@@ -41,6 +41,14 @@ class MercadoPublico:
         r.raise_for_status()
         return float(r.json()["price"])
 
+    def precios(self, pares: list[str]) -> dict[str, float]:
+        """Todos los precios en una sola consulta."""
+        por_simbolo = {simbolo(p): p for p in pares}
+        r = self.sesion.get(URL_PRECIO, params={"symbols": json.dumps(sorted(por_simbolo), separators=(",", ":"))},
+                            timeout=15)
+        r.raise_for_status()
+        return {por_simbolo[x["symbol"]]: float(x["price"]) for x in r.json()}
+
 
 class BrokerPapel(MercadoPublico):
     """Simula las órdenes con precios reales. Ideal para probar en cualquier computadora."""
@@ -70,8 +78,19 @@ class BrokerBinance(MercadoPublico):
         self.ex.load_markets()
 
     def precio(self, par: str) -> float:
-        # se usa el precio de la misma bolsa donde se opera (el Testnet tiene sus propios precios)
         return float(self.ex.fetch_ticker(par)["last"])
+
+    def precios(self, pares: list[str]) -> dict[str, float]:
+        t = self.ex.fetch_tickers(pares)
+        return {p: float(t[p]["last"]) for p in pares}
+
+    def velas(self, par: str, temporalidad: str, limite: int = 300) -> pd.DataFrame:
+        filas = self.ex.fetch_ohlcv(par, temporalidad, limit=limite)
+        df = pd.DataFrame([f[:6] for f in filas], columns=["t", "open", "high", "low", "close", "volume"])
+        df.index = pd.to_datetime(df.pop("t"), unit="ms", utc=True)
+        df = df.astype(float)
+        cierre = df.index + pd.Timedelta(seconds=DURACION[temporalidad])
+        return df[cierre <= datetime.now(timezone.utc)]
 
     def _comision_usdt(self, orden: dict, base: str, precio: float) -> tuple[float, float]:
         """Devuelve (comisión en USDT, comisión cobrada en la moneda base)."""

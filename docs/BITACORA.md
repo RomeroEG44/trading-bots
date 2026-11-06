@@ -36,3 +36,18 @@
 **Siguiente:**
 - Edgar: configurar Telegram, arrancar en Testnet y dejarlo correr; reportar cualquier error.
 - Claude: investigar mejores estrategias (validación fuera de muestra); opcional, gráfica de precio con marcas de compra/venta.
+
+## 2026-11-06 · Sesión 3: nuevo enfoque (Master + bots en paralelo)
+**Hecho:**
+- Se eliminó Telegram (código, configuración y documentación).
+- Master (`master.py`) con 9 reglas automáticas; integrado en el motor y en el backtest.
+- 3 estrategias nuevas: reversión (Bollinger), ruptura (Donchian) y rejilla; base común con stops.
+- `config/testnet.yaml` con 6 bots rápidos en paralelo; Supervisor con reanudación automática.
+- Panel nuevo, "Centro de Control": tabla de bots, gráfica por bot con compras y ventas, análisis en vivo,
+  feedback del Master y operaciones; se actualiza cada 3 s.
+- 35 pruebas pasando. Prueba en vivo en modo papel con los 6 bots: unos 5 min, 0 errores.
+- Backtest de 7 días: −8.2 % sin Master, −2.0 % con Master.
+
+**Siguiente:**
+- Edgar: actualizar, arrancar en Testnet y dejarlo correr; contar qué ve en el panel.
+- Claude: con datos del Testnet, ajustar parámetros y buscar estrategias que ganen después de comisiones.

@@ -65,6 +65,12 @@ class Almacen:
     def ejecuciones(self, limite: int = 100) -> list[dict]:
         return self._filas("SELECT * FROM ejecuciones ORDER BY id DESC LIMIT ?", (limite,))
 
+    def ejecuciones_por_bot(self) -> dict[str, list[dict]]:
+        res: dict[str, list[dict]] = {}
+        for f in self._filas("SELECT bot, lado, monto_usdt, comision_usdt, ganancia_usdt FROM ejecuciones ORDER BY id"):
+            res.setdefault(f["bot"], []).append(f)
+        return res
+
     def ejecuciones_desde(self, desde: datetime) -> list[dict]:
         return self._filas("SELECT * FROM ejecuciones WHERE tiempo >= ? ORDER BY id", (_iso(desde),))
 
@@ -82,6 +88,13 @@ class Almacen:
 
     def valores(self, desde: datetime) -> list[dict]:
         return self._filas("SELECT tiempo, total FROM valores WHERE tiempo >= ? ORDER BY tiempo", (_iso(desde),))
+
+    def curvas_por_bot(self, desde: datetime) -> dict[str, list[float]]:
+        res: dict[str, list[float]] = {}
+        for f in self._filas("SELECT detalle FROM valores WHERE tiempo >= ? ORDER BY tiempo", (_iso(desde),)):
+            for bot, v in json.loads(f["detalle"] or "{}").items():
+                res.setdefault(bot, []).append(v)
+        return res
 
     # ----- clave/valor (estado del supervisor, foto en vivo para el panel) -----
     def poner(self, clave: str, valor) -> None:

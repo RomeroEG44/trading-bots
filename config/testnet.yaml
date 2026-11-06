@@ -1,0 +1,79 @@
+# Configuración para el TESTNET (y modo papel): 6 bots rápidos en paralelo.
+# Todo es experimental: el Master mide en vivo qué funciona y frena lo que no.
+# Si tu cuenta Testnet tiene menos USDT que la suma de presupuestos (2,400), baja presupuesto_usdt.
+comision_pct: 0.1
+deslizamiento_pct: 0.05
+
+riesgo:                         # límites DUROS del Supervisor para todo el sistema
+  pares_permitidos: [BTC/USDT, ETH/USDT]
+  orden_minima_usdt: 5
+  orden_maxima_usdt: 400
+  max_compras_por_hora: 30
+  perdida_diaria_max_pct: 3     # pausa compras hasta el día siguiente (se reanuda solo)
+  caida_maxima_pct: 10          # detiene compras...
+  reanudar_auto_horas: 2        # ...y se reanuda solo 2 h después (autonomía total)
+
+master:                         # reglas del Master (bot principal)
+  racha_perdidas: 3             # 3 pérdidas seguidas -> pausa del bot
+  enfriamiento_min: 15
+  caida_reducir_pct: 4          # el bot cae 4% desde su máximo -> menos tamaño
+  caida_cuarentena_pct: 8       # cae 8% -> cierra su posición y cuarentena
+  cuarentena_min: 120
+  perdida_max_posicion_pct: 2.5 # el Master cierra cualquier posición que pierda más que esto
+  operaciones_para_evaluar: 5
+  factor_bueno: 1.3
+  factor_malo: 0.8
+  tamano_min: 0.25
+  tamano_max: 1.5
+  comisiones_max_pct: 50
+  movimiento_brusco_pct: 1.5    # si un par se mueve 1.5% en 5 min, bloquea compras 10 min
+  ventana_brusca_min: 5
+  bloqueo_brusco_min: 10
+  retirar_min_ventas: 20         # tras 20 ventas con factor < 0.5, el bot se retira 24 h
+  retirar_factor: 0.5
+  retiro_horas: 24
+
+bots:
+  - nombre: tendencia_btc_1m
+    estrategia: tendencia
+    par: BTC/USDT
+    temporalidad: 1m
+    presupuesto_usdt: 400
+    parametros: {stop_loss_pct: 0.4, take_profit_pct: 0.8, trailing_activacion_pct: 0.4, trailing_pct: 0.25, fraccion_capital: 0.5}
+
+  - nombre: tendencia_eth_5m
+    estrategia: tendencia
+    par: ETH/USDT
+    temporalidad: 5m
+    presupuesto_usdt: 400
+    parametros: {stop_loss_pct: 0.8, take_profit_pct: 1.6, trailing_activacion_pct: 0.8, trailing_pct: 0.5, fraccion_capital: 0.5}
+
+  - nombre: reversion_btc_5m
+    estrategia: reversion
+    par: BTC/USDT
+    temporalidad: 5m
+    presupuesto_usdt: 400
+    parametros: {periodo: 20, desviaciones: 2.0, rsi_max_entrada: 35, stop_loss_pct: 0.8, fraccion_capital: 0.5}
+
+  - nombre: ruptura_eth_15m
+    estrategia: ruptura
+    par: ETH/USDT
+    temporalidad: 15m
+    presupuesto_usdt: 400
+    parametros: {entrada_velas: 20, salida_velas: 10, stop_loss_pct: 1.0, trailing_activacion_pct: 1.0, trailing_pct: 0.6, fraccion_capital: 0.5}
+
+  - nombre: rejilla_btc
+    estrategia: rejilla
+    par: BTC/USDT
+    temporalidad: 1m
+    presupuesto_usdt: 400
+    parametros: {paso_pct: 0.4, monto_usdt: 50, max_lotes: 6}
+    master: {perdida_max_posicion_pct: 3.5}   # la rejilla aguanta más caída por diseño
+
+  - nombre: dca_eth_15m
+    estrategia: dca
+    par: ETH/USDT
+    temporalidad: 15m
+    presupuesto_usdt: 400
+    parametros: {monto_usdt: 20, cada_horas: 0.5, caida_para_doble_pct: 0.7, multiplicador_caida: 2, toma_ganancia_pct: 1.0, fraccion_venta: 0.5}
+    master: {perdida_max_posicion_pct: 4}

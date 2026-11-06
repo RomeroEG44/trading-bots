@@ -14,3 +14,9 @@ Formato: fecha · decisión · por qué · quién decidió.
 - 2026-11-06 · Bot DCA compra **semanal** (antes cada 3 días) · Que el presupuesto dure todo el periodo · Claude (propuesta)
 - 2026-11-06 · Los bots que operan corren en la PC de Edgar (o VPS en país permitido) · Binance bloquea la API desde la nube de Claude · Restricción técnica
 - 2026-11-06 · Ventas siempre permitidas aunque el supervisor esté pausado/detenido; solo se bloquean compras · Un stop-loss nunca debe quedar bloqueado · Claude
+- 2026-11-06 · **Se elimina Telegram**; todo el seguimiento se hace en el panel web · Pedido de Edgar · Edgar
+- 2026-11-06 · **Bot Master** que supervisa a los demás: ajusta tamaño, enfría, pone en cuarentena, cierra posiciones y retira bots · Pedido de Edgar; reglas propuestas por Claude · Edgar + Claude
+- 2026-11-06 · **6 bots rápidos en paralelo** (1 a 15 min) en Testnet, en lugar de un DCA semanal · Pedido de Edgar: resultados en horas · Edgar
+- 2026-11-06 · **Autonomía total**: nada pide confirmación; el Supervisor se reanuda solo 2 h después de una detención automática · Pedido de Edgar · Edgar
+- 2026-11-06 · El modo REAL sigue exigiendo `--confirmo-dinero-real` una sola vez al arrancar (nunca por operación) · Evitar arrancar con dinero real por error · Claude
+- 2026-11-06 · En Testnet, las velas y los precios vienen del propio Testnet (antes, de los datos públicos) · Que las señales coincidan con los precios a los que se opera · Claude

@@ -4,7 +4,7 @@ Reglas:
 - Las COMPRAS solo se permiten si el supervisor está "activo".
 - Las VENTAS (reducir riesgo, stop-loss) siempre se permiten, aunque esté pausado o detenido.
 - Pérdida diaria > límite  -> "pausado" hasta el siguiente día (UTC); se reanuda solo.
-- Caída desde el máximo > límite -> "detenido"; solo Edgar puede reanudar.
+- Caída desde el máximo > límite -> "detenido"; se reanuda solo tras `reanudar_auto_horas` (si está configurado).
 """
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ class LimitesRiesgo:
     max_compras_por_hora: int = 4
     perdida_diaria_max_pct: float = 3.0
     caida_maxima_pct: float = 10.0
+    reanudar_auto_horas: float | None = None  # tras una detención AUTOMÁTICA, reanuda solo después de N horas
 
 
 @dataclass
@@ -51,6 +52,8 @@ class Supervisor:
         self.ultimo_valor: float | None = None
         self.eventos: list[Evento] = []
         self.bots_pausados: set[str] = set()
+        self.detenido_desde: datetime | None = None
+        self.detencion_automatica = False
         self._compras: dict[str, deque] = defaultdict(deque)
 
     # ---------- revisión de órdenes ----------
@@ -98,11 +101,16 @@ class Supervisor:
         self.valor_maximo = valor_total if self.valor_maximo is None else max(self.valor_maximo, valor_total)
 
         if self.estado == "detenido":
+            h = self.limites.reanudar_auto_horas
+            if (h is not None and self.detencion_automatica and self.detenido_desde
+                    and ahora - self.detenido_desde >= timedelta(hours=h)):
+                self.reanudar(ahora, f"reanudación automática tras {h:g} h")
             return
         caida = 1 - valor_total / self.valor_maximo
         if caida * 100 >= self.limites.caida_maxima_pct:
             self._cambiar(ahora, "detenido", "detencion",
                           f"caída de {caida:.1%} desde el máximo ({self.valor_maximo:.2f} → {valor_total:.2f} USDT)")
+            self.detenido_desde, self.detencion_automatica = ahora, True
             return
         if self.estado == "activo":
             perdida_dia = 1 - valor_total / self.valor_inicio_dia
@@ -114,6 +122,7 @@ class Supervisor:
     # ---------- comandos de Edgar ----------
     def detener_todo(self, ahora: datetime, motivo: str = "orden manual de Edgar") -> None:
         self._cambiar(ahora, "detenido", "detencion", motivo)
+        self.detenido_desde, self.detencion_automatica = ahora, False  # una detención manual no se reanuda sola
 
     def pausar(self, ahora: datetime, motivo: str = "pausa manual de Edgar") -> None:
         """Pausa las compras de todos los bots hasta que Edgar reanude."""
@@ -128,11 +137,13 @@ class Supervisor:
         self.bots_pausados.discard(bot)
         self.eventos.append(Evento(ahora, "reanudacion", f"bot {bot} reanudado por Edgar"))
 
-    def reanudar(self, ahora: datetime) -> None:
+    def reanudar(self, ahora: datetime, motivo: str = "reanudado") -> None:
         self.pausado_hasta = None
+        self.detenido_desde, self.detencion_automatica = None, False
         if self.ultimo_valor is not None:
             self.valor_maximo = self.ultimo_valor  # se empieza a medir la caída desde aquí
-        self._cambiar(ahora, "activo", "reanudacion", "reanudado")
+        self.valor_inicio_dia = self.ultimo_valor
+        self._cambiar(ahora, "activo", "reanudacion", motivo)
 
     # ---------- guardar / recuperar (para reinicios) ----------
     def exportar(self) -> dict:
@@ -142,6 +153,8 @@ class Supervisor:
             "dia_actual": self.dia_actual.isoformat() if self.dia_actual else None,
             "valor_inicio_dia": self.valor_inicio_dia, "valor_maximo": self.valor_maximo,
             "ultimo_valor": self.ultimo_valor, "bots_pausados": sorted(self.bots_pausados),
+            "detenido_desde": self.detenido_desde.isoformat() if self.detenido_desde else None,
+            "detencion_automatica": self.detencion_automatica,
         }
 
     def cargar(self, d: dict) -> None:
@@ -154,6 +167,8 @@ class Supervisor:
         self.valor_maximo = d.get("valor_maximo")
         self.ultimo_valor = d.get("ultimo_valor")
         self.bots_pausados = set(d.get("bots_pausados", []))
+        self.detenido_desde = datetime.fromisoformat(d["detenido_desde"]) if d.get("detenido_desde") else None
+        self.detencion_automatica = d.get("detencion_automatica", False)
 
     # ---------- internos ----------
     def _reanudar_si_toca(self, ahora: datetime) -> None:

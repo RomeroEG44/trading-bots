@@ -1,8 +1,8 @@
 # Trading Bots (Binance)
 
-Bots de trading automáticos para Binance con un bot supervisor que controla el riesgo y reporta por Telegram,
-y un panel web para ver qué hace cada bot.
+Bots de trading automáticos para Binance que corren en paralelo, con un bot **Master** que los vigila y corrige,
+un Supervisor de riesgo y un panel web en tiempo real. Ver [docs/ESTRUCTURA.md](docs/ESTRUCTURA.md).
 
-**Estado:** Fase 0, plan en borrador. Ver [docs/PLAN.md](docs/PLAN.md).
+**Estado:** Fase 2: Testnet con 6 bots en paralelo. Ver [docs/PLAN.md](docs/PLAN.md).
 
 ⚠️ Proyecto en pruebas. Opera solo en Binance Testnet hasta completar las fases de validación.

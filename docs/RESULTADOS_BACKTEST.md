@@ -53,5 +53,5 @@ gana muy poco cuando sube. Con solo 10-16 operaciones por periodo, la muestra es
 - Probar mejoras con método: ajustar con un periodo y validar en otro distinto, para no "hacerle trampa" al pasado.
 - Ideas a probar: filtro de tendencia larga (solo comprar si el precio está sobre la media de 200 días), DCA que
   solo compra cuando el precio está bajo su promedio, rotación entre BTC y ETH.
-- Seguir con la Fase 2 (Testnet) **en paralelo**, porque la maquinaria (supervisor, Telegram, panel) sirve
+- Seguir con la Fase 2 (Testnet) **en paralelo**, porque la maquinaria (supervisor, panel) sirve
   para cualquier estrategia.

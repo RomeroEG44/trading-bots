@@ -18,6 +18,8 @@ from .datos import DURACION, descargar_velas
 from .estrategias import crear_estrategia
 from .modelos import Cartera, Ejecucion
 from .simulador import Simulador
+from .master import Feedback, Master, ReglasMaster
+from .metricas import metricas_bot
 from .supervisor import Evento, Supervisor
 
 
@@ -49,6 +51,8 @@ class Resultado:
     eventos: list[Evento]
     curva: pd.Series = field(repr=False)
     reanudar_tras_dias: float | None = None
+    feedback: list = field(default_factory=list)
+    usar_master: bool = True
 
     @property
     def presupuesto(self) -> float:
@@ -64,10 +68,12 @@ def caida_maxima(curva: pd.Series) -> float:
 
 
 def ejecutar_backtest(config: Config, inicio: datetime, fin: datetime,
-                      reanudar_tras_dias: float | None = None) -> Resultado:
+                      reanudar_tras_dias: float | None = None, usar_master: bool = True) -> Resultado:
     """reanudar_tras_dias: simula que Edgar reanuda N días después de una detención (None = nunca)."""
     sim = Simulador(config.comision_pct, config.deslizamiento_pct)
     sup = Supervisor(config.riesgo)
+    master = Master(ReglasMaster.desde(config.master), {b.nombre: b.master for b in config.bots if b.master}) if usar_master else None
+    feedback: list = []
     bots = []
     for b in config.bots:
         estrategia = crear_estrategia(b.estrategia, b.nombre, b.par, b.parametros)
@@ -84,6 +90,23 @@ def ejecutar_backtest(config: Config, inicio: datetime, fin: datetime,
     posiciones = {x["cfg"].nombre: {t: i for i, t in enumerate(x["velas"].index)} for x in bots}
     curva = {}
 
+    def intentar(x, intencion, ahora_bot):
+        precio_ref = intencion.precio if intencion.precio is not None else x["ultimo_precio"]
+        if master is not None:
+            intencion, motivo = master.ajustar(intencion, ahora_bot)
+            if intencion is None:
+                x["rechazos"][motivo.split(" (")[0]] += 1
+                return
+        decision = sup.revisar(intencion, x["cartera"], precio_ref, ahora_bot)
+        if not decision.aprobada:
+            x["rechazos"]["Supervisor: " + decision.motivo.split(" (")[0]] += 1
+            return
+        ej = sim.ejecutar(decision.intencion, x["cartera"], x["ultimo_precio"], ahora_bot)
+        x["estrategia"].en_ejecucion(ej)
+        if master is not None:
+            master.en_ejecucion(ej)
+        x["ejecuciones"].append(ej)
+
     for t in linea_tiempo:
         ahora = None
         for x in bots:
@@ -94,17 +117,17 @@ def ejecutar_backtest(config: Config, inicio: datetime, fin: datetime,
             ahora = max(ahora or ahora_bot, ahora_bot)
             ventana = x["velas"].iloc[: i + 1]
             x["ultimo_precio"] = float(ventana["close"].iloc[-1])
+            if master is not None:
+                master.registrar_precio(x["cfg"].par, ahora_bot, x["ultimo_precio"])
             if i + 1 < x["estrategia"].velas_minimas:
                 continue
             for intencion in x["estrategia"].en_vela(ventana, x["cartera"], ahora_bot):
-                precio_ref = intencion.precio if intencion.precio is not None else x["ultimo_precio"]
-                decision = sup.revisar(intencion, x["cartera"], precio_ref, ahora_bot)
-                if not decision.aprobada:
-                    x["rechazos"][decision.motivo.split(" (")[0]] += 1
-                    continue
-                ej = sim.ejecutar(decision.intencion, x["cartera"], x["ultimo_precio"], ahora_bot)
-                x["estrategia"].en_ejecucion(ej)
-                x["ejecuciones"].append(ej)
+                intentar(x, intencion, ahora_bot)
+            for intencion in x["estrategia"].en_precio(x["ultimo_precio"], x["cartera"]):
+                intentar(x, intencion, ahora_bot)
+            if master is not None:
+                for intencion in master.revisar(ahora_bot, x["cfg"].nombre, x["cartera"], x["ultimo_precio"]):
+                    intentar(x, intencion, ahora_bot)
         if ahora is None:
             continue
         total = 0.0
@@ -117,6 +140,8 @@ def ejecutar_backtest(config: Config, inicio: datetime, fin: datetime,
         if (reanudar_tras_dias is not None and sup.estado == "detenido"
                 and ahora - sup.eventos[-1].tiempo >= timedelta(days=reanudar_tras_dias)):
             sup.reanudar(ahora)
+        if master is not None:
+            feedback += master.tomar_feedback()
 
     resultados = []
     for x in bots:
@@ -129,7 +154,8 @@ def ejecutar_backtest(config: Config, inicio: datetime, fin: datetime,
             comprar_y_mantener_pct=((1 - config.comision_pct / 100) * p1 / p0 - 1) * 100,
             precio_inicio=p0, precio_fin=p1,
         ))
-    return Resultado(config, inicio, fin, resultados, sup.eventos, pd.Series(curva), reanudar_tras_dias)
+    return Resultado(config, inicio, fin, resultados, sup.eventos, pd.Series(curva), reanudar_tras_dias,
+                     feedback, usar_master)
 
 
 # ---------------- reporte ----------------
@@ -147,20 +173,23 @@ def reporte_markdown(r: Resultado) -> str:
         "",
         "## Resumen",
         "",
-        "| Bot | Par | Capital | Valor final | Resultado | Peor caída | Si solo compraba y esperaba | Compras | Ventas | Comisiones |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Bot | Par | Capital | Valor final | Resultado | Peor caída | Comprar y esperar | Ventas | Acierto | Factor | Comisiones |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for b in r.bots:
-        compras = sum(e.lado == "compra" for e in b.ejecuciones)
-        ventas = sum(e.lado == "venta" for e in b.ejecuciones)
+        m = metricas_bot(b.ejecuciones)
+        acierto = f"{m['tasa_acierto']:.0%}" if m["tasa_acierto"] is not None else "—"
+        factor = "—" if m["factor_beneficio"] is None else ("∞" if m["factor_beneficio"] == float("inf") else f"{m['factor_beneficio']:.2f}")
         L.append(
             f"| {b.nombre} | {b.par} | {_usd(b.presupuesto)} | {_usd(b.valor_final)} | {b.rendimiento_pct:+.1f}% | "
-            f"-{b.caida_maxima_pct:.1f}% | {b.comprar_y_mantener_pct:+.1f}% | {compras} | {ventas} | "
-            f"{_usd(sum(e.comision_usdt for e in b.ejecuciones))} |"
+            f"-{b.caida_maxima_pct:.1f}% | {b.comprar_y_mantener_pct:+.1f}% | {m['ventas']} | {acierto} | {factor} | "
+            f"{_usd(m['comisiones'])} |"
         )
     total_pct = (r.valor_final / r.presupuesto - 1) * 100
     L += [f"| **Total** | | {_usd(r.presupuesto)} | {_usd(r.valor_final)} | **{total_pct:+.1f}%** | "
-          f"-{caida_maxima(r.curva):.1f}% | | | | |", ""]
+          f"-{caida_maxima(r.curva):.1f}% | | | | | |", "",
+          f"Master: {'activo' if r.usar_master else 'desactivado'}"
+          + (f" · {len(r.feedback)} intervenciones." if r.usar_master else "."), ""]
 
     for b in r.bots:
         L += [f"## {b.nombre}", "", f"Precio {b.par}: {_usd(b.precio_inicio)} → {_usd(b.precio_fin)}.", ""]
@@ -181,6 +210,10 @@ def reporte_markdown(r: Resultado) -> str:
             L.append(f"| {e.tiempo:%Y-%m-%d %H:%M} | {e.lado} | {_usd(e.precio)} | {_usd(e.monto_usdt)} | {g} | {e.motivo} |")
         L.append("")
 
+    if r.feedback:
+        L += ["## Feedback del Master (últimos 25)", ""]
+        L += [f"- {f.tiempo:%Y-%m-%d %H:%M} · {f.bot or 'mercado'} · {f.mensaje}" for f in r.feedback[-25:]]
+        L.append("")
     L += ["## Eventos del supervisor", ""]
     L += [f"- {e.tiempo:%Y-%m-%d %H:%M} · **{e.tipo}** · {e.mensaje}" for e in r.eventos] or ["- Ninguno."]
     L.append("")
@@ -190,8 +223,9 @@ def reporte_markdown(r: Resultado) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Backtest de los bots")
     ap.add_argument("--config", default="config/pruebas.yaml")
-    ap.add_argument("--dias", type=int, default=730)
+    ap.add_argument("--dias", type=float, default=730)
     ap.add_argument("--fin", help="fecha final AAAA-MM-DD (por defecto: hoy)")
+    ap.add_argument("--sin-master", action="store_true", help="correr sin el Master (para comparar)")
     ap.add_argument("--reanudar-tras-dias", type=float, default=7,
                     help="simula que Edgar reanuda N días después de una detención (por defecto 7)")
     args = ap.parse_args()
@@ -200,12 +234,12 @@ def main() -> None:
            else datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0))
     inicio = fin - timedelta(days=args.dias)
     config = cargar_config(args.config)
-    resultado = ejecutar_backtest(config, inicio, fin, args.reanudar_tras_dias)
+    resultado = ejecutar_backtest(config, inicio, fin, args.reanudar_tras_dias, not args.sin_master)
     texto = reporte_markdown(resultado)
 
     carpeta = RAIZ / "reports"
     carpeta.mkdir(exist_ok=True)
-    salida = carpeta / f"backtest_{config.nombre}_{args.dias}d.md"
+    salida = carpeta / f"backtest_{config.nombre}_{args.dias:g}d{'_sin_master' if args.sin_master else ''}.md"
     salida.write_text(texto, encoding="utf-8")
     print(texto)
     print(f"\nReporte guardado en {salida.relative_to(RAIZ)}")

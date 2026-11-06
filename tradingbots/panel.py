@@ -1,10 +1,11 @@
-"""Panel web para ver qué hacen los bots. Solo accesible desde tu propia computadora (localhost).
+"""Panel web en tiempo real. Solo accesible desde tu propia computadora (localhost).
 
 Normalmente lo arranca el motor. Para abrirlo solo:  python -m tradingbots.panel --modo testnet
 """
 from __future__ import annotations
 
 import argparse
+import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -15,8 +16,9 @@ from pydantic import BaseModel
 
 from .almacen import Almacen
 from .config import RAIZ
+from .metricas import metricas_bot
 
-HTML = (Path(__file__).parent / "panel.html").read_text(encoding="utf-8")
+AQUI = Path(__file__).parent
 ACCIONES = {"pausar", "reanudar", "detener_todo"}
 
 
@@ -25,26 +27,42 @@ class Comando(BaseModel):
     bot: str | None = None
 
 
+def _json_seguro(d):
+    """JSON no acepta infinito: se manda como null + bandera."""
+    return {k: (None if isinstance(v, float) and math.isinf(v) else v) for k, v in d.items()}
+
+
 def crear_app(db: Almacen) -> FastAPI:
     app = FastAPI(title="Panel de bots", docs_url=None, redoc_url=None)
-    app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+    app.mount("/static", StaticFiles(directory=AQUI / "static"), name="static")
 
     @app.get("/", response_class=HTMLResponse)
     def inicio():
-        return HTML
+        return (AQUI / "panel.html").read_text(encoding="utf-8")
 
     @app.get("/api/estado")
-    def estado(dias: int = 7):
+    def estado(horas: int = 24):
+        ahora = datetime.now(timezone.utc)
+        desde = ahora - timedelta(hours=max(1, min(horas, 24 * 90)))
+        por_bot = db.ejecuciones_por_bot()
+        curvas = db.curvas_por_bot(desde)
         en_vivo = db.obtener("en_vivo")
-        ejecuciones = db.ejecuciones(200)
-        ganancia_realizada = sum(e["ganancia_usdt"] or 0 for e in ejecuciones if e["lado"] == "venta")
+        nombres = [b["nombre"] for b in en_vivo["bots"]] if en_vivo else list(por_bot)
+        metricas = {}
+        for n in nombres:
+            m = metricas_bot(por_bot.get(n, []), curvas.get(n))
+            m["factor_infinito"] = m["factor_beneficio"] == float("inf")
+            metricas[n] = _json_seguro(m)
+        global_ = metricas_bot([e for lista in por_bot.values() for e in lista])
+        global_["factor_infinito"] = global_["factor_beneficio"] == float("inf")
         return {
+            "ahora": ahora.isoformat(),
             "en_vivo": en_vivo,
-            "ahora": datetime.now(timezone.utc).isoformat(),
-            "ejecuciones": ejecuciones,
-            "eventos": db.eventos(60),
-            "valores": db.valores(datetime.now(timezone.utc) - timedelta(days=max(1, min(dias, 365)))),
-            "ganancia_realizada": ganancia_realizada,
+            "metricas": metricas,
+            "global": _json_seguro(global_),
+            "ejecuciones": db.ejecuciones(300),
+            "eventos": db.eventos(150),
+            "valores": db.valores(desde),
         }
 
     @app.post("/api/comando")
@@ -52,14 +70,14 @@ def crear_app(db: Almacen) -> FastAPI:
         if c.accion not in ACCIONES:
             raise HTTPException(400, f"acción no válida: {c.accion}")
         db.agregar_comando(c.accion, c.bot, "panel")
-        return {"ok": True, "mensaje": "Comando enviado; el motor lo aplica en unos segundos."}
+        return {"ok": True}
 
     return app
 
 
 def iniciar_panel(db: Almacen, puerto: int = 8000) -> None:
     import uvicorn
-    # 127.0.0.1 = solo esta computadora puede abrir el panel (nadie de afuera)
+    # 127.0.0.1 = solo esta computadora puede abrir el panel
     uvicorn.run(crear_app(db), host="127.0.0.1", port=puerto, log_level="warning")
 
 

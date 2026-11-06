@@ -9,7 +9,6 @@ from tradingbots.config import BotConfig, Config
 from tradingbots.mercado import BrokerBinance
 from tradingbots.modelos import Cartera, Intencion
 from tradingbots.motor import Motor
-from tradingbots.notificador import Notificador
 from tradingbots.panel import crear_app
 from tradingbots.simulador import Simulador
 from tradingbots.supervisor import LimitesRiesgo
@@ -30,6 +29,8 @@ class BrokerFalso:
 
     def precio(self, par): return self.p
 
+    def precios(self, pares): return {p: self.p for p in pares}
+
     def velas(self, par, temporalidad, limite=300):
         fin = self.reloj().replace(minute=0, second=0)
         idx = pd.date_range(end=fin - timedelta(hours=1), periods=limite, freq="h", tz="UTC")
@@ -37,18 +38,6 @@ class BrokerFalso:
 
     def ejecutar(self, intencion, cartera, ahora):
         return self.sim.ejecutar(intencion, cartera, self.p, ahora)
-
-
-class TelegramFalso(Notificador):
-    def __init__(self):
-        super().__init__()
-        self.enviados, self.entrantes = [], []
-
-    def enviar(self, texto): self.enviados.append(texto)
-
-    def leer_comandos(self):
-        c, self.entrantes = self.entrantes, []
-        return c
 
 
 def config(**riesgo):
@@ -61,101 +50,104 @@ def config(**riesgo):
 def entorno(tmp_path):
     reloj = Reloj(T0)
     db = Almacen(tmp_path / "bots.sqlite")
-    broker, tg = BrokerFalso(reloj), TelegramFalso()
-    return reloj, db, broker, tg, Motor(config(), broker, db, tg, reloj=reloj, hora_reporte=99)
+    broker = BrokerFalso(reloj)
+    return reloj, db, broker, Motor(config(), broker, db, reloj=reloj)
 
 
-def test_ciclo_compra_guarda_y_avisa(entorno):
-    reloj, db, broker, tg, m = entorno
+def test_ciclo_compra_y_guarda_foto_para_el_panel(entorno):
+    reloj, db, broker, m = entorno
     m.paso()
     ops = db.ejecuciones()
     assert len(ops) == 1 and ops[0]["lado"] == "compra" and ops[0]["monto_usdt"] == 10
-    assert any("compró" in t for t in tg.enviados)
-    assert db.obtener("en_vivo")["bots"][0]["efectivo"] == pytest.approx(990)
+    bot = db.obtener("en_vivo")["bots"][0]
+    assert bot["efectivo"] == pytest.approx(990)
+    assert bot["master"]["estado"] == "activo" and bot["analisis"]["texto"]
+    assert len(bot["grafica"]) > 0
     reloj.t += timedelta(minutes=1)
     m.paso()  # misma vela: no vuelve a comprar
     assert len(db.ejecuciones()) == 1
 
 
-def test_estado_sobrevive_a_un_reinicio(entorno, tmp_path):
-    reloj, db, broker, tg, m = entorno
+def test_estado_sobrevive_a_un_reinicio(entorno):
+    reloj, db, broker, m = entorno
+    m.paso()
+    m.master.fichas["dca_btc"].tamano = 0.5
     m.paso()
     reloj.t += timedelta(hours=2)
-    m2 = Motor(config(), broker, db, TelegramFalso(), reloj=reloj, hora_reporte=99)
+    m2 = Motor(config(), broker, db, reloj=reloj)
     assert m2.bots["dca_btc"].cartera.efectivo == pytest.approx(990)
     assert m2.bots["dca_btc"].estrategia.ultima_compra_t is not None
+    assert m2.master.fichas["dca_btc"].tamano == 0.5
     m2.paso()  # no han pasado 24 h: no compra otra vez tras reiniciar
     assert len(db.ejecuciones()) == 1
 
 
-def test_comandos_de_telegram_y_panel(entorno):
-    reloj, db, broker, tg, m = entorno
-    tg.entrantes = ["/pausar"]
+def test_comandos_del_panel(entorno):
+    reloj, db, broker, m = entorno
+    db.agregar_comando("pausar")
     m.paso()
     assert m.sup.estado == "pausado"
-    assert db.ejecuciones() == []  # la compra fue rechazada
+    assert db.ejecuciones() == []
     assert any(e["tipo"] == "rechazo" for e in db.eventos())
     db.agregar_comando("reanudar")
     reloj.t += timedelta(hours=25)
     m.paso()
     assert m.sup.estado == "activo" and len(db.ejecuciones()) == 1
-    tg.entrantes = ["/estado", "/pausar dca_btc", "/inventado"]
+    db.agregar_comando("pausar", "dca_btc")
     m.paso()
     assert "dca_btc" in m.sup.bots_pausados
-    assert any("<b>Estado</b>" in t for t in tg.enviados)
-    assert any("No conozco" in t for t in tg.enviados)
 
 
-def test_supervisor_detiene_por_caida_y_avisa(entorno):
-    reloj, db, broker, tg, m = entorno
+def test_master_cierra_posicion_que_pierde_demasiado(entorno):
+    reloj, db, broker, m = entorno
+    m.paso()  # compra a 100
+    broker.p = 96.0  # -4 %: más que el límite del Master (2.5 %)
+    reloj.t += timedelta(minutes=1)
+    m.paso()
+    ops = db.ejecuciones()
+    assert ops[0]["lado"] == "venta" and "Master" in ops[0]["motivo"]
+    assert any(e["tipo"] == "master_alerta" for e in db.eventos())
+
+
+def test_supervisor_detiene_y_se_reanuda_solo(entorno):
+    reloj, db, broker, m = entorno
+    m.sup.limites.reanudar_auto_horas = 1
+    m.master.reglas_base.perdida_max_posicion_pct = 99
+    m.master.reglas_base.caida_cuarentena_pct = 99
     m.paso()
     m.sup.limites.caida_maxima_pct = 0.5
-    broker.p = 10.0  # la posición de 10 USDT pierde 90 %: ~0.9 % del total
+    broker.p = 10.0
     reloj.t += timedelta(minutes=1)
     m.paso()
     assert m.sup.estado == "detenido"
-    assert any("Supervisor · detencion" in t for t in tg.enviados)
+    reloj.t += timedelta(hours=1, minutes=1)
+    m.paso()
+    assert m.sup.estado == "activo"
+    assert any("automática" in e["mensaje"] for e in db.eventos())
 
 
 def test_error_del_broker_no_detiene_el_motor(entorno):
-    reloj, db, broker, tg, m = entorno
+    reloj, db, broker, m = entorno
 
     def falla(*a): raise RuntimeError("Binance caído")
     broker.ejecutar = falla
     m.paso()
-    assert any(e["tipo"] == "error" for e in db.eventos())
-    assert any("Binance caído" in t for t in tg.enviados)
+    assert any(e["tipo"] == "error" and "Binance caído" in e["mensaje"] for e in db.eventos())
 
 
 def test_panel_api(entorno):
-    reloj, db, broker, tg, m = entorno
+    reloj, db, broker, m = entorno
     m.paso()
     cli = TestClient(crear_app(db))
-    assert "Panel de Bots" in cli.get("/").text
+    assert "Centro de Control" in cli.get("/").text
+    assert cli.get("/static/chart.umd.min.js").status_code == 200
     d = cli.get("/api/estado").json()
     assert d["en_vivo"]["modo"] == "papel" and len(d["ejecuciones"]) == 1
+    assert d["metricas"]["dca_btc"]["compras"] == 1 and d["global"]["operaciones"] == 1
     assert cli.post("/api/comando", json={"accion": "detener_todo"}).status_code == 200
     assert cli.post("/api/comando", json={"accion": "borrar_todo"}).status_code == 400
     m.paso()
     assert m.sup.estado == "detenido"
-
-
-def test_notificador_ignora_chats_desconocidos():
-    class Resp:
-        def __init__(self, d): self.d = d
-        def raise_for_status(self): pass
-        def json(self): return self.d
-
-    class Sesion:
-        def get(self, url, params, timeout):
-            return Resp({"result": [
-                {"update_id": 1, "message": {"chat": {"id": 999}, "text": "/detener_todo"}},
-                {"update_id": 2, "message": {"chat": {"id": 42}, "text": "/estado"}},
-            ]})
-
-    n = Notificador("token", "42", sesion=Sesion())
-    n._offset = None
-    assert n.leer_comandos() == ["/estado"]
 
 
 def test_tendencia_vigila_stop_con_precio_en_vivo():
@@ -163,9 +155,9 @@ def test_tendencia_vigila_stop_con_precio_en_vivo():
     e = Tendencia("t", "ETH/USDT")
     c = Cartera("t", "ETH/USDT", 1000)
     e.en_ejecucion(Simulador(0, 0).ejecutar(Intencion("t", "ETH/USDT", "compra", monto_usdt=900), c, 100, T0))
-    assert e.revisar_salidas(99, c) == []
-    assert e.revisar_salidas(104, c) == []  # sube el máximo, activa trailing
-    [v] = e.revisar_salidas(101.5, c)
+    assert e.en_precio(99, c) == []
+    assert e.en_precio(104, c) == []  # sube el máximo, activa trailing
+    [v] = e.en_precio(101.5, c)
     assert "Trailing" in v.motivo
     restaurada = Tendencia("t", "ETH/USDT")
     restaurada.cargar_estado(e.exportar_estado())

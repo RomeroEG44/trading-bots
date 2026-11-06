@@ -1,4 +1,7 @@
-# Plan del proyecto: Trading Bots en Binance (v0.2)
+# Plan del proyecto: Trading Bots en Binance (v0.3)
+
+> **v0.3:** Telegram eliminado; bot **Master** que supervisa y corrige; 6 bots rápidos en paralelo en Testnet;
+> autonomía total. El diseño vigente está en `docs/ESTRUCTURA.md`. Las secciones 1 a 5 de abajo son del diseño original.
 
 > v0.2: Bot Tendencia en velas diarias y DCA semanal, por los resultados del backtest (`docs/RESULTADOS_BACKTEST.md`).
 
@@ -7,7 +10,7 @@
 ```
                  ┌──────────────────────────────┐
    Edgar  ◄──────┤   BOT SUPERVISOR (principal) │◄──── Panel web (ver todo en vivo)
- (Telegram)      │ - vigila a los bots          │
+                 │ - vigila a los bots          │
                  │ - aplica límites de riesgo   │
                  │ - botón de pánico (detener)  │
                  │ - reportes y alertas         │
@@ -66,8 +69,8 @@ Regla clave: **ningún bot manda una orden a Binance sin que el supervisor la ap
 | Límite por bot | Cada bot tiene su presupuesto; no puede usar dinero de otro. |
 | Anti-errores | Máximo de órdenes por hora; si un bot "se vuelve loco", se pausa solo. |
 | Salud | Si Binance no responde o un bot deja de reportar, avisa. |
-| Reportes | Resumen diario y alertas inmediatas por Telegram; todo visible en el panel. |
-| Comandos de Edgar | Por Telegram: `/estado`, `/pausar`, `/reanudar`, `/detener_todo`, `/reporte`. |
+| Reportes | Todo visible en el panel web en tiempo real. |
+| Controles | Opcionales, desde el panel: pausar bot y detener todo. |
 
 ## 4. Panel web (para "ver qué están haciendo")
 - Estado de cada bot (activo, pausado, detenido) y por qué.
@@ -81,7 +84,6 @@ Regla clave: **ningún bot manda una orden a Binance sin que el supervisor la ap
 - **ccxt**: librería que habla con Binance (y con otros exchanges si algún día cambiamos). Soporta el Testnet.
 - **SQLite**: base de datos en un solo archivo; guarda operaciones, saldos y registros.
 - **FastAPI + página web sencilla**: el panel.
-- **Telegram**: canal de mensajes entre el supervisor y Edgar (gratis, llega al celular).
 - **Docker** (más adelante): para correr todo igual en tu PC o en un servidor.
 
 ## 6. Fases
@@ -90,7 +92,7 @@ Regla clave: **ningún bot manda una orden a Binance sin que el supervisor la ap
 |---|---|---|---|
 | **0. Fundación** | Repo en GitHub, memoria, estructura, conexión de **solo lectura** al Testnet. | Vemos el saldo de prueba desde el código. | No |
 | **1. Backtest** | Los 2 bots se prueban con 1-2 años de datos históricos reales, incluyendo comisiones. | Reporte con ganancia, peor caída y número de operaciones. Decidimos si vale la pena. | No |
-| **2. Testnet** | Bots + supervisor + Telegram + panel corriendo 24/7 con dinero de prueba. | Mínimo 2-4 semanas sin errores y con resultados parecidos al backtest. | No |
+| **2. Testnet** | 6 bots en paralelo + Master + Supervisor + panel, corriendo 24/7 con dinero de prueba. | Mínimo 2-4 semanas sin errores y con resultados parecidos al backtest. | No |
 | **3. Real (pequeño)** | Mismo sistema con poco dinero real (ej. 50-100 USD en total). | 1 mes estable. Edgar decide si sube el monto. | Sí, poco |
 | **4. Crecer** | Más bots o estrategias, ajustar parámetros, servidor definitivo. | — | Según decida Edgar |
 
@@ -105,5 +107,5 @@ que operan no pueden correr aquí (aquí solo se programan y se hacen backtests)
 - [x] Crear el repositorio `trading-bots` en GitHub.
 - [x] Instalar el proyecto en tu PC.
 - [x] Crear cuenta en el **Binance Spot Testnet** y verificar la conexión. *(Fase 0)*
-- [ ] Crear un bot de Telegram con @BotFather: `docs/GUIA_INSTALACION.md`, paso 8. *(Fase 2)*
+- [ ] Actualizar y arrancar los 6 bots en Testnet: `docs/GUIA_INSTALACION.md`, pasos 7-9. *(Fase 2)*
 - [ ] Revisar este plan y responder `docs/PREGUNTAS.md`.
